@@ -180,14 +180,25 @@ local function CreateSubmenu(name)
 	return submenu
 end
 
-local function CreateBindingsTree()
-	local bindingsTree = CreateSubmenu("Root node")
+--[[
+local BindingsTree = CreateSubmenu("Binding Tree Root Node")
+BindingsTree
+
+local function BindingsTree:new()
+	local new = {}
+	setmetatable(new, self)
+	self.__index = self
+	return new
 end
-LeaderKey = CreateBindingsTree()
+--]]
+
+local function CreateBindingsTree()
+	LeaderKey = CreateSubmenu("Root node")
+end
+CreateBindingsTree()
 
 -- Guaranteed to return a submenu node.
-local function GetParentNode(...)
-	local keySequence = {...}
+local function GetParentNode(keySequence)
 	keySequence = slice(keySequence, 1, #keySequence - 1)
 	i = 1
 	local value = keySequence[i]
@@ -206,10 +217,9 @@ local function GetParentNode(...)
 end
 
 -- TODO stop taking varargs, take arrays.
-local function GetNode(...)
-	local keySequence = {...}
+local function GetNode(keySequence)
 	if #keySequence == 0 then return LeaderKey end
-	local parent = GetParentNode(...)
+	local parent = GetParentNode(keySequence)
 	if not parent then return nil end
 	local bind = keySequence[#keySequence]
 	if not parent or parent.type ~= SUBMENU or not parent.bindings[bind] then
@@ -219,40 +229,38 @@ local function GetNode(...)
 	end
 end
 
-local function PrepareSubmenus(...)
+local function PrepareSubmenus(keySequence)
 	local bindings = LeaderKey.bindings
-	local keySequence = {...}
 	keySequence = slice(keySequence, 1, #keySequence - 1)
 	local i = 1
 	local value = keySequence[i]
 
 	while value do
 		if not bindings[value] or bindings[value].type ~= SUBMENU then
-			bindings[value] = CreateSubmenu(nil)
+			bindings[value] = CreateSubmenu(table.concat(slice(keySequence, 1, i), " "))
 		end
 		bindings = bindings[value].bindings
 		i = i + 1
 		value = keySequence[i]
 	end
+	return bindings
 end
 
-local function GetBindingConflicts(...)
+local function GetBindingConflicts(keySequence)
 	-- TODO
 
 end
 
-local function AddBind(node, ...)
-	PrepareSubmenus(...)
-	local keySequence = {...}
+local function AddBind(node, keySequence)
+	local bindings = PrepareSubmenus(keySequence)
 	local bind = keySequence[#keySequence]
-	GetParentNode(...).bindings[bind] = node
+	bindings[bind] = node
 end
 
 -- TODO is throwing errors all the time that useful? Maybe just return an error value or something.
 
 -- Also deletes any childless parent submenus.
-local function DeleteNode(...)
-	local keySequence = {...}
+local function DeleteNode(keySequence)
 	local bind = keySequence[#keySequence]
 	keySequence = slice(keySequence, 1, #keySequence - 1)
 
@@ -306,8 +314,8 @@ local function DeleteNode(...)
 	end
 end
 
-local function NameNode(name, ...)
-	local node = GetNode(...)
+local function NameNode(name, keySequence)
+	local node = GetNode(keySequence)
 	node.name = name
 end
 
@@ -388,7 +396,7 @@ function AfterLeaderKeyHandlerFrame:printOptions(sequenceStr)
 	for key in sequenceStr:gmatch("%S+") do
 		keySequence[#keySequence + 1] = key
 	end
-	local node = GetNode(unpack(keySequence))
+	local node = GetNode(keySequence)
 
 	print("|c4aacd3FF##### switched table:", node.name, "#####|r")
 
@@ -448,7 +456,7 @@ registerSlashCommand("LEADERKEY_MAP", {"/lkmap"},
 								--old_CreateBind(args[1], unpack(slice(args, 2)))
 								local node = CreateNode(nil, MACRO)
 								node.macro = args[1]
-								AddBind(node, unpack(slice(args, 2)))
+								AddBind(node, slice(args, 2))
 								UpdateKeybinds()
                      end
 )
@@ -456,7 +464,7 @@ registerSlashCommand("LEADERKEY_UNMAP", {"/lkunmap"},
                      function(txt, editbox)
 								local args = parseArgs(txt)
 								--old_DeleteNode(unpack(args))
-								DeleteNode(unpack(args))
+								DeleteNode(args)
 								UpdateKeybinds()
                      end
 )
@@ -509,11 +517,11 @@ do
 		for i in str:gmatch("%S+") do
 			split[#split + 1] = i
 		end
-		return unpack(split)
+		return split
 	end
 
 	do
-		local result = {kssplit('A B')}
+		local result = kssplit('A B')
 		assert(result[1] == 'A')
 		assert(result[2] == 'B')
 	end
@@ -631,6 +639,28 @@ do
 	DeleteNode('A B C')
 	assert(not GetNode('A'))
 
+function timetest()
+	local startTime = GetTime()
+	local arr = {'A', 'B', 'C', 'D', 'E', 'F', 'G', "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
+	CreateBindingsTree()
+	for _,a in pairs(arr) do
+		for _,b in pairs(arr) do
+			for _,c in pairs(arr) do
+				for _,d in pairs(arr) do
+					AddBind("K " .. a .. " " .. b .. " " .. c .. " " .. d, CreateMacro("bla", "bla"))
+				end
+			end
+		end
+	end
+	local t = GetTime()
+	print(startTime, t)
+	local elapsed = t - startTime
+	print("Time to create", #arr * #arr * #arr, "bindings:", elapsed)
+	startTime = GetTime()
+	--UpdateKeybinds()
+	elapsed = GetTime() - startTime
+	print("Time to update", #arr * #arr * #arr, "bindings:", elapsed)
+end
 	-- Set up some nice defaults for ingame testing.
 	CreateBindingsTree()
 	AddBind('K T K', CreateMacro("Katy (Mailbox, 10 mins)", "/use Katy's Stampwhistle"))
@@ -648,6 +678,7 @@ do
 	NameNode('K T', "Toys")
 
 	UpdateKeybinds()
+
 end
 --rsc("LEADERKEY_MAP", "'/script ToggleCollectionsJournal(1)' K C M")
 
