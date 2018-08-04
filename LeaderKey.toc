@@ -1,0 +1,14 @@
+## Interface: 80000
+## Title: Leader Key
+## Author: geheur
+## Version: 1.0
+## Notes: Allows you to bind to key sequences a la vi's :noremap.
+## DefaultState: Enabled
+## LoadOnDemand: 0
+## SavedVariables: LeaderKeyData
+
+frames.xml
+
+utils.lua
+main.lua
+test.lua
