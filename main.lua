@@ -9,7 +9,7 @@ local function slice(tbl, first, last, step)
   return sliced
 end
 
-local debug = true
+local debug = false
 local function debugPrint(...)
 	if not debug then return end
 	print("|cFFFFA500[LeaderKey]:", ...)
@@ -40,18 +40,21 @@ The resulting value will be a string containing instructions to rebuild the valu
 local secureTableInsert do
 	local function serializeValue(value)
 		if type(value) == "string" then
-			return ("%q"):format(value)
+			--return ("%q"):format(value)
+			return value
 		else -- number, boolean, nil
 			return tostring(value)
 		end
 	end
+	local splitvalue = 21 -- "negative acknowledge" - no clue what it does, but I don't expect anyone to use it.
+	local splitchar = string.char(splitvalue)
 	local serializeVariableHelper
 	local function serializeTableContents(table)
 		local serializedContents = ""
 		for i,v in pairs(table) do
 			local serializedValue = serializeVariableHelper(i, v)
 			if serializedValue then
-				serializedContents = serializedContents .. serializedValue .. ","
+				serializedContents = serializedContents .. serializedValue .. splitchar
 			end
 		end
 		return serializedContents
@@ -63,9 +66,9 @@ local secureTableInsert do
 			--return nil
 			error("key " .. name .. " is not serializable into the secure environment because its value is of type " .. valueType)
 		elseif valueType == "table" then
-			return string.format("'TABLE',%s,%s'ENDTABLE'", serializeValue(name), serializeTableContents(value))
+			return string.format("TABLE" .. splitchar .. "%s" .. splitchar .. "%sENDTABLE", serializeValue(name), serializeTableContents(value))
 		else -- string, number, boolean
-			return string.format("'VALUE',%s,%s", serializeValue(name), serializeValue(value))
+			return string.format("VALUE" .. splitchar .. "%s" .. splitchar .. "%s", serializeValue(name), serializeValue(value))
 		end
 	end
 	local escapeForSecureEnvironment do
@@ -75,43 +78,55 @@ local secureTableInsert do
 		end
 	end
 	local function serializeVariable(name, value)
-		return escapeForSecureEnvironment(serializeVariableHelper(name, value))
+		--return ("%q"):format(value)
+		--return escapeForSecureEnvironment(serializeVariableHelper(name, value))
+		return escapeForSecureEnvironment(("%q"):format(serializeVariableHelper(name, value)))
 	end
 	function secureTableInsert(secureHeader, varName, table)
 		local snippet = [[self:Run([=[
-			local int i = 1
-			local secureTableInsertStack = newtable() -- keeps track of the parents.
-			secureTableInsertStack.current = _G
-			secureTableInsertStack.parent = nil
+			local stack = newtable() -- keeps track of the parents.
+			stack.current = _G
+			stack.parent = nil
 
+         local splitchar = ""
+			local t = newtable()
+       	for str in string.gmatch((...), "([^\]] .. splitvalue .. [[]+)") do
+         	t[#t + 1] = str
+       	end
+
+			local i = 1
 			while true do
-				local type = select(i, ...)
+				--local type = select(i, ...)
+				local type = t[i]
 				if not type then
-					if secureTableInsertStack.current ~= _G then error("format issue, table incomplete") end
+					if stack.current ~= _G then print("ERROR: format issue, table incomplete") end
 					break -- should be the end of the table.
 				elseif type == "ENDTABLE" then
-					secureTableInsertStack = secureTableInsertStack.parent
-					if not secureTableInsertStack then error("tried to modify above _G") end
+					stack = stack.parent
+					if not stack then print("ERROR: tried to modify above _G") end
 
 					i = i + 1
 				elseif type == "TABLE" then
-					local name = select(i + 1, ...)
+					--local name = select(i + 1, ...)
+					local name = t[i + 1]
 
 					local createdTable = newtable()
-					secureTableInsertStack.current[name] = createdTable
+					stack.current[name] = createdTable
 
-					-- push onto secureTableInsertStack
+					-- push onto stack
 					local newstack = newtable()
 					newstack.current = createdTable
-					newstack.parent = secureTableInsertStack
-					secureTableInsertStack = newstack
+					newstack.parent = stack
+					stack = newstack
 					
 					i = i + 2
 				elseif type == "VALUE" then
-					local name = select(i + 1, ...)
-					local value = select(i + 2, ...)
+					--local name = select(i + 1, ...)
+					local name = t[i + 1]
+					--local value = select(i + 2, ...)
+					local value = t[i + 2]
 
-					secureTableInsertStack.current[name] = value
+					stack.current[name] = value
 					
 					i = i + 3
 				else
@@ -120,7 +135,8 @@ local secureTableInsert do
 			end
 		--]=],%s)]]
 		local serializedVar = serializeVariable(varName, table)
-		snippet = string.format(snippet, serializedVar)
+		--debugPrint("serializedVar", serializedVar)
+		snippet = string.format(snippet, serializedVar) -- TODO change back.
 
 		debugPrint("snippet length:", snippet:len())
 		local count = 0
@@ -571,10 +587,10 @@ local function SlashCommandNameNode(bindingsTree, txt)
 	local keySequence = slice(args, 2)
 
 	local successful = LeaderKey.NameNode(bindingsTree, name, keySequence)
+	UpdateKeybinds()
 	if successful then
 		info("Named node " .. table.concat(keySequence, " ") .. " to " .. name)
 	end
-	UpdateKeybinds()
 end
 
 registerSlashCommand("LEADERKEY_ACCOUNT_MAP", {"/lkamap"},
@@ -695,15 +711,18 @@ function LeaderKey.GetCurrentSpecBindingsTree()
 	local specId = GetSpecialization()
 	debugPrint("Spec:", specId)
 	if not specId then return BindingsTree:new() end -- Happens sometimes on load. TODO see if you can move bindings load to a later event, like PLAYER_ENTERING_WORLD. TODO move code related to this (if there will be any) into the loading code, not here.
-	return LeaderKey.GetSpecBindingsTree(class, specId) -- 2 is the localization-independent name.
+	local currentSpecBindingsTree = LeaderKey.GetSpecBindingsTree(class, specId) -- 2 is the localization-independent name.
+	ViragCurrentSpecBindingsPointer = currentSpecBindingsTree
+	return currentSpecBindingsTree
 end
 
 function LeaderKey.GetCurrentClassBindingsTree()
 	local class = select(2, UnitClass("player"))
-	debugPrint("Class:", class)
+	debugPrint("Class:", class) -- TODO remove this.
 	return LeaderKey.GetClassBindingsTree(class) -- 2 is the localization-independent name.
 end
 
+-- TODO WTF is this?
 function LeaderKey.PrintBinds(bindingsTree)
 	warning("Account bindings:")
 	printBindings(LeaderKey.GetAccountBindingsTree)
@@ -737,11 +756,11 @@ local function printCurrentBindsHelper(bindingsTree, checkAgainst, sequence)
 end
 
 function LeaderKey.PrintCurrentBinds()
-	warning("Account bindings:")
+	warning("|c4aacd3FF### Account bindings: ###|r")
 	printCurrentBindsHelper(LeaderKey.GetAccountBindingsTree(), {["Current Class"] = LeaderKey.GetCurrentClassBindingsTree(), ["Current Spec"] = LeaderKey.GetCurrentSpecBindingsTree()})
-	warning("Class bindings:")
+	warning("|c4aacd3FF### Class bindings: ###|r")
 	printCurrentBindsHelper(LeaderKey.GetCurrentClassBindingsTree(), {["Current Spec"] = LeaderKey.GetCurrentSpecBindingsTree})
-	warning("Spec bindings:")
+	warning("|c4aacd3FF### Spec bindings: ###|r")
 	printCurrentBindsHelper(LeaderKey.GetCurrentSpecBindingsTree(), {})
 end
 
@@ -768,10 +787,12 @@ end
 local events = {}
 -- TODO remove (debug)
 function events:PLAYER_ENTERING_WORLD(...)
-	if ViragDevTool_AddData then
+	if ViragDevTool_AddData and debug then
 		ViragDevTool_AddData(ViragCurrentBindingsPointer.bindings, "LKMAP")
 		ViragDevTool_AddData(LeaderKeyData.accountBindings, "LKMAP_ACCOUNT")
 		ViragDevTool_AddData(LeaderKeyData.classBindings, "LKMAP_CLASS")
+		ViragDevTool_AddData(LeaderKey.GetCurrentClassBindingsTree(), "LKMAP_CURRENT_CLASS")
+		ViragDevTool_AddData(ViragCurrentSpecBindingsPointer.bindings, "LKMAP")
 	end
 end
 do
@@ -798,20 +819,8 @@ end
 registerEventHandlers(events)
 
 -- Test code. TODO remove this eventually.
-do
-	local testTable = "dog's"
-	local testTable2 = {
-		subtable1 = {
-			value1 = "hello",
-			value2 = 3,
-		},
-		value3 = "value3",
-		subtable2 = {
-			value4 = true,
-		},
-	}
+if debug then
 	registerSlashCommand("TEST", {"/test"}, function(txt) local bla = parseArgs(txt); if not bla then print("returned nil"); return end; for i,v in pairs(bla) do warning(i,v) end end)
+	registerSlashCommand("RL", {"/rl"}, SlashCmdList["RELOAD"])
 end
-
-registerSlashCommand("RL", {"/rl"}, SlashCmdList["RELOAD"])
 
