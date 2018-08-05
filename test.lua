@@ -168,6 +168,5 @@ end
 	LeaderKey.UpdateCurrentKeybinds()
 
 	--rsc("LEADERKEY_MAP", "'/script ToggleCollectionsJournal(1)' K C M")
-	--[[
 end
 

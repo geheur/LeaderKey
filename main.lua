@@ -9,6 +9,12 @@ local function slice(tbl, first, last, step)
   return sliced
 end
 
+local debug = true
+local function debugPrint(...)
+	if not debug then return end
+	print("|cFFFFA500[LeaderKey]:", ...)
+end
+
 local function tableSize(tbl)
 	local count = 0
 	for i,v in pairs(tbl) do
@@ -116,13 +122,12 @@ local secureTableInsert do
 		local serializedVar = serializeVariable(varName, table)
 		snippet = string.format(snippet, serializedVar)
 
-		print("snippet length:", snippet:len())
-
+		debugPrint("snippet length:", snippet:len())
 		local count = 0
 		for i in string.gmatch(serializedVar, ",") do
 			count = count + 1
 		end
-		print("num commas:", count)
+		debugPrint("num commas:", count)
 
 		secureHeader:Execute(snippet)
 	end
@@ -130,12 +135,6 @@ end
 
 -- ### start of addon code
 LeaderKey = {}
-
-local debug = false
-local function debugPrint(...)
-	if not debug then return end
-	print("|cFFFFA500[LeaderKey]:", ...)
-end
 
 local function warning(...)
 	local bla = slice({...}, 2)
@@ -529,34 +528,6 @@ local function parseArgs(txt)
 	return args
 end
 
-local function parseArgs2(txt)
-	local args = {}
-	local inSingleQuote = false
-	for i in txt:gmatch("%S+") do
-		if inSingleQuote then
-			args[#args] = args[#args] .. " " .. i
-		else
-			args[#args + 1] = i
-		end
-		if i:find("'") == 1 then
-			inSingleQuote = true
-			args[#args] = args[#args]:sub(2)
-		end
-		if i:find("'") == i:len() then
-			inSingleQuote = false
-			args[#args] = args[#args]:sub(1, args[#args]:len() - 1)
-		end
-		-- single quote on its own will break this most likely.
-	end
-
-	debugPrint("Args:")
-	for i,v in pairs(args) do
-		debugPrint(i,v)
-	end
-
-	return args
-end
-
 local macrotype = "macro"
 local spelltype = "spell"
 local function SlashCommandMapBind(bindingsTree, txt)
@@ -719,11 +690,18 @@ function LeaderKey.GetClassBindingsTree(class)
 end
 
 function LeaderKey.GetCurrentSpecBindingsTree()
-	return LeaderKey.GetSpecBindingsTree(select(2, UnitClass("player")), GetSpecialization()) -- 2 is the localization-independent name.
+	local class = select(2, UnitClass("player"))
+	debugPrint("Class:", class)
+	local specId = GetSpecialization()
+	debugPrint("Spec:", specId)
+	if not specId then return BindingsTree:new() end -- Happens sometimes on load. TODO see if you can move bindings load to a later event, like PLAYER_ENTERING_WORLD. TODO move code related to this (if there will be any) into the loading code, not here.
+	return LeaderKey.GetSpecBindingsTree(class, specId) -- 2 is the localization-independent name.
 end
 
 function LeaderKey.GetCurrentClassBindingsTree()
-	return LeaderKey.GetClassBindingsTree(select(2, UnitClass("player"))) -- 2 is the localization-independent name.
+	local class = select(2, UnitClass("player"))
+	debugPrint("Class:", class)
+	return LeaderKey.GetClassBindingsTree(class) -- 2 is the localization-independent name.
 end
 
 function LeaderKey.PrintBinds(bindingsTree)
