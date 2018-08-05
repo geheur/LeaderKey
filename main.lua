@@ -74,38 +74,38 @@ local secureTableInsert do
 	function secureTableInsert(secureHeader, varName, table)
 		local snippet = [[self:Run([=[
 			local int i = 1
-			local stack = newtable() -- keeps track of the parents.
-			stack.current = _G
-			stack.parent = nil
+			local secureTableInsertStack = newtable() -- keeps track of the parents.
+			secureTableInsertStack.current = _G
+			secureTableInsertStack.parent = nil
 
 			while true do
 				local type = select(i, ...)
 				if not type then
-					if stack.current ~= _G then error("format issue, table incomplete") end
+					if secureTableInsertStack.current ~= _G then error("format issue, table incomplete") end
 					break -- should be the end of the table.
 				elseif type == "ENDTABLE" then
-					stack = stack.parent
-					if not stack then error("tried to modify above _G") end
+					secureTableInsertStack = secureTableInsertStack.parent
+					if not secureTableInsertStack then error("tried to modify above _G") end
 
 					i = i + 1
 				elseif type == "TABLE" then
 					local name = select(i + 1, ...)
 
 					local createdTable = newtable()
-					stack.current[name] = createdTable
+					secureTableInsertStack.current[name] = createdTable
 
-					-- push onto stack
+					-- push onto secureTableInsertStack
 					local newstack = newtable()
 					newstack.current = createdTable
-					newstack.parent = stack
-					stack = newstack
+					newstack.parent = secureTableInsertStack
+					secureTableInsertStack = newstack
 					
 					i = i + 2
 				elseif type == "VALUE" then
 					local name = select(i + 1, ...)
 					local value = select(i + 2, ...)
 
-					stack.current[name] = value
+					secureTableInsertStack.current[name] = value
 					
 					i = i + 3
 				else
@@ -114,51 +114,38 @@ local secureTableInsert do
 			end
 		--]=],%s)]]
 		local serializedVar = serializeVariable(varName, table)
-		secureHeader:Execute(string.format(snippet, serializedVar))
+		snippet = string.format(snippet, serializedVar)
+
+		print("snippet length:", snippet:len())
+
+		local count = 0
+		for i in string.gmatch(serializedVar, ",") do
+			count = count + 1
+		end
+		print("num commas:", count)
+
+		secureHeader:Execute(snippet)
 	end
 end
 
--- ### SavedVariables
-if not LeaderKeyData then
-	LeaderKeyData = {
-		accountBindings = {},
-		classBindings = {
---[[
-			classId/name/englishname = {
-				specID = {},	
-			},
---]]
-		},
-	}
-end
-if not LeaderKeyCharacterData then -- TODO add to TOC.
-	LeaderKeyCharacterData = {
-		charactername = {}
-	}
+-- ### start of addon code
+LeaderKey = {}
+
+local debug = false
+local function debugPrint(...)
+	if not debug then return end
+	print("|cFFFFA500[LeaderKey]:", ...)
 end
 
-local ACCOUNT_SCOPE = "accountBindings"
-local CLASS_SCOPE = "classBindings"
--- Class given by id/name?
--- Spec given by id.
-
-local function CreateSavedBinding(node, binding)
-	return {node = node, binding = binding}
+local function warning(...)
+	local bla = slice({...}, 2)
+	print("|cFFFFA500[LeaderKey]:" .. select(1, ...), unpack(bla))
 end
 
-local function CreateBinding(bindingsTable, node, ...)
-	--for i,v in pairs(bindingsTable) do
-		--if v.binding
+local function info(...)
+	local bla = slice({...}, 2)
+	print("[LeaderKey]: " .. select(1, ...), unpack(bla))
 end
-
-local function CreateAccountBinding(node, ...)
-	CreateBinding(LeaderKeyData.accountBindings, node, ...)
-end
-
-local function DeleteBinding(bindingsTable, ...)
-
-end
-
 
 -- ### Bindings table, and manipulating functions.
 local SUBMENU = "submenu"
@@ -168,10 +155,19 @@ local function CreateNode(name, type)
 	return {name = name, type = type}
 end
 
-local function CreateMacro(name, macro)
+local function CreateMacroNode(name, macro)
+	name = name or "MACRO: " .. macro
 	local macroNode = CreateNode(name, MACRO)
 	macroNode.macro = macro
 	return macroNode
+end
+
+local function CreateSpellNode(name, spellName)
+	local name, rank, icon, castTime, minRange, maxRange, spellId = GetSpellInfo(spellName)
+	if not name then
+		error("|cFFFFA500Could not find spell " .. spellName .. ".|r") -- TODO do not error here. Either that or catch it.
+	end
+	return CreateMacroNode(name, '/use ' .. spellName)
 end
 
 local function CreateSubmenu(name)
@@ -180,29 +176,25 @@ local function CreateSubmenu(name)
 	return submenu
 end
 
---[[
-local BindingsTree = CreateSubmenu("Binding Tree Root Node")
-BindingsTree
+local BindingsTree = {type = SUBMENU}
+BindingsTree.__index = BindingsTree
 
-local function BindingsTree:new()
-	local new = {}
-	setmetatable(new, self)
-	self.__index = self
-	return new
+function BindingsTree:new()
+	return BindingsTree:cast({})
 end
---]]
 
-local function CreateBindingsTree()
-	LeaderKey = CreateSubmenu("Root node")
+function BindingsTree:cast(toCast)
+	setmetatable(toCast, self)
+	if toCast.bindings == nil then toCast.bindings = {} end
+	return toCast
 end
-CreateBindingsTree()
 
 -- Guaranteed to return a submenu node.
-local function GetParentNode(keySequence)
+function BindingsTree:GetParentNode(keySequence)
 	keySequence = slice(keySequence, 1, #keySequence - 1)
 	i = 1
 	local value = keySequence[i]
-	local node = LeaderKey
+	local node = self
 
 	while value do
 		if not node.bindings[value] or node.bindings[value].type ~= SUBMENU then
@@ -216,10 +208,9 @@ local function GetParentNode(keySequence)
 	return node
 end
 
--- TODO stop taking varargs, take arrays.
-local function GetNode(keySequence)
-	if #keySequence == 0 then return LeaderKey end
-	local parent = GetParentNode(keySequence)
+function BindingsTree:GetNode(keySequence)
+	if #keySequence == 0 then return self end
+	local parent = self:GetParentNode(keySequence)
 	if not parent then return nil end
 	local bind = keySequence[#keySequence]
 	if not parent or parent.type ~= SUBMENU or not parent.bindings[bind] then
@@ -229,8 +220,8 @@ local function GetNode(keySequence)
 	end
 end
 
-local function PrepareSubmenus(keySequence)
-	local bindings = LeaderKey.bindings
+function BindingsTree:PrepareSubmenus(keySequence)
+	local bindings = self.bindings
 	keySequence = slice(keySequence, 1, #keySequence - 1)
 	local i = 1
 	local value = keySequence[i]
@@ -246,13 +237,14 @@ local function PrepareSubmenus(keySequence)
 	return bindings
 end
 
-local function GetBindingConflicts(keySequence)
+function BindingsTree:GetBindingConflicts(keySequence)
 	-- TODO
+	error("NYI")
 
 end
 
-local function AddBind(node, keySequence)
-	local bindings = PrepareSubmenus(keySequence)
+function BindingsTree:AddBind(node, keySequence)
+	local bindings = self:PrepareSubmenus(keySequence)
 	local bind = keySequence[#keySequence]
 	bindings[bind] = node
 end
@@ -260,11 +252,11 @@ end
 -- TODO is throwing errors all the time that useful? Maybe just return an error value or something.
 
 -- Also deletes any childless parent submenus.
-local function DeleteNode(keySequence)
+function BindingsTree:DeleteNode(keySequence)
 	local bind = keySequence[#keySequence]
 	keySequence = slice(keySequence, 1, #keySequence - 1)
 
-	local node = LeaderKey
+	local node = self
 	local i = 1
 	local value = keySequence[i]
 
@@ -303,7 +295,7 @@ local function DeleteNode(keySequence)
 	end
 
 	if deleteAllBindings then
-		LeaderKey.bindings = {}
+		self.bindings = {}
 	end
 	if lastStraightTreeBind then
 		lastStraightTreeParent.bindings[lastStraightTreeBind] = nil
@@ -314,10 +306,20 @@ local function DeleteNode(keySequence)
 	end
 end
 
-local function NameNode(name, keySequence)
-	local node = GetNode(keySequence)
+function BindingsTree:NameNode(name, keySequence)
+	local node = self:GetNode(keySequence)
+	if not node then warning("Node " .. table.concat(keySequence, " ") .. " does not exist."); return false end
 	node.name = name
+	return true
 end
+
+local ViragCurrentBindingsPointer
+local CurrentBindings
+local function CreateBindingsTree()
+	CurrentBindings = BindingsTree:new()
+	ViragCurrentBindingsPointer = CurrentBindings
+end
+CreateBindingsTree()
 
 -- ### Core keybind setup code.
 AfterLeaderKeyHandlerFrame = CreateFrame("BUTTON", "After Leader Key Handler Frame", nil, "SecureHandlerClickTemplate,SecureActionButtonTemplate")
@@ -334,23 +336,26 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 
 	currentSequence = ""
 
+	ClearSequenceInProgress = [[
+		currentBindings = nil
+		currentSequence = ""
+		self:ClearBindings()
+	--]]
+
 	OnClick = [[
 	if not currentBindings then currentBindings = Bindings end
 	local button, down = ...
 
 	if button == "ESCAPE" then
 		print("|cFFFF0000Key sequence ESCAPE|r") -- TODO do outside.
-		currentBindings = nil
-		self:ClearBindings()
+		self:Run(ClearSequenceInProgress)
 		return
 	end
 
 	for bind,node in pairs(currentBindings) do
 		if bind == button then
 			if node.type == MACRO then
-				currentBindings = nil
-				currentSequence = ""
-				self:ClearBindings()
+				self:Run(ClearSequenceInProgress)
 
 				self:SetAttribute("type", "macro")
 				self:SetAttribute("macrotext", node.macro)
@@ -377,14 +382,49 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 AfterLeaderKeyHandlerFrame:WrapScript(AfterLeaderKeyHandlerFrame, "OnClick", "self:Run(OnClick, button, down) return true", "print('|cFFFF0000After onclick wrap called.|r') self:SetAttribute('type', nil)") -- TODO why doesn't the after script run?
 LeaderKeyOverrideBindOwner = CreateFrame("BUTTON", "Leader Key Override Bind Owner", nil, "SecureHandlerBaseTemplate")
 
+local function CopyInBindingsTree(currentBindingsTree, bindingsTree)
+	for key,node in pairs(bindingsTree.bindings) do
+		local currentNode = currentBindingsTree.bindings[key]
+		if node.type == SUBMENU then
+			if currentNode ~= nil and currentNode.type ~= SUBMENU then
+				print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
+			end
+			if currentNode == nil or currentNode.type ~= SUBMENU then
+				currentBindingsTree.bindings[key] = CreateSubmenu(node.name) -- TODO copy function?
+			end
+			CopyInBindingsTree(currentBindingsTree.bindings[key], node)
+		else
+			if currentNode ~= nil then
+				print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
+			end
+			debugPrint("binding", currentBindingsTree.name or "", key, "to", node.name)
+			currentBindingsTree.bindings[key] = node -- TODO make sure no one changes this node...
+		end
+	end
+end
+
+local function BuildCurrentBindingsTree()
+	CreateBindingsTree()
+
+	debugPrint("adding account bindings")
+	CopyInBindingsTree(CurrentBindings, LeaderKey.GetAccountBindingsTree())
+	debugPrint("adding class bindings")
+	CopyInBindingsTree(CurrentBindings, LeaderKey.GetCurrentClassBindingsTree())
+	debugPrint("adding spec bindings")
+	CopyInBindingsTree(CurrentBindings, LeaderKey.GetCurrentSpecBindingsTree())
+end
+
 -- Updates keybind tree in AfterLeaderKeyHandlerFrame's restricted environment, and makes sure leader keys are bound. Out of combat only, obviously.
 local function UpdateKeybinds()
+	BuildCurrentBindingsTree()
+
 	LeaderKeyOverrideBindOwner:Execute("self:ClearBindings()")
-	for i,v in pairs(LeaderKey.bindings) do
+	for i,v in pairs(CurrentBindings.bindings) do
 		SetOverrideBindingClick(LeaderKeyOverrideBindOwner, true, i, AfterLeaderKeyHandlerFrame:GetName(), i)
 	end
 
-	secureTableInsert(AfterLeaderKeyHandlerFrame, "Bindings", LeaderKey.bindings)
+	secureTableInsert(AfterLeaderKeyHandlerFrame, "Bindings", CurrentBindings.bindings)
+	AfterLeaderKeyHandlerFrame:Execute("self:Run(ClearSequenceInProgress)")
 end
 
 
@@ -396,9 +436,10 @@ function AfterLeaderKeyHandlerFrame:printOptions(sequenceStr)
 	for key in sequenceStr:gmatch("%S+") do
 		keySequence[#keySequence + 1] = key
 	end
-	local node = GetNode(keySequence)
+	local node = CurrentBindings:GetNode(keySequence)
+	if not node then warning("Node " .. table.concat(keySequence, " ") .. " does not exist."); return end
 
-	print("|c4aacd3FF##### switched table:", node.name, "#####|r")
+	print("|c4aacd3FF#####", (node.name or "nil"), "#####|r")
 
 	if not tableIsEmpty(node.bindings) then
 		print("|cFFFF0000No bindings, press escape to quit. This should not happen.|r")
@@ -407,12 +448,24 @@ function AfterLeaderKeyHandlerFrame:printOptions(sequenceStr)
 	-- TODO color differently depending on type.
 	for nextBind,nextNode in pairs(node.bindings) do
 		if nextNode.type == MACRO then
-			print(nextBind .. ": " .. (nextNode.name or nextNode.macro)) -- TODO color differently if name vs macro contents.
+			print(nextBind .. " -> |cFFFFA500" .. (nextNode.name or nextNode.macro or "nil") .. "|r") -- TODO color differently if name vs macro contents.
 		end
 	end
 	for nextBind,nextNode in pairs(node.bindings) do
 		if nextNode.type == SUBMENU then
 			print(nextBind .. " -> |c4aacd3FF" .. (nextNode.name or "[no name]") .. "|r")
+		end
+	end
+end
+
+local function printBindings(bindingsTree, sequence)
+	sequence = sequence or ""
+	for key,node in pairs(bindingsTree.bindings) do
+		local newSequence = sequence .. key .. " "
+		if node.type ~= SUBMENU then
+			warning(newSequence:sub(1, newSequence:len() - 1) .. ":", node.name)
+		else
+			printBindings(node, newSequence)
 		end
 	end
 end
@@ -427,6 +480,57 @@ end
 
 local function parseArgs(txt)
 	local args = {}
+	local start = nil
+	local breakLoop = false;
+	local i = 1
+	while i <= #txt do
+		local c = txt:sub(i,i)
+		if c == " " then
+			if start then
+				args[#args + 1] = txt:sub(start,i - 1)
+				start = nil
+			end
+			-- continue
+		elseif c == "'" or c == '"' then
+			if start then
+				args[#args + 1] = txt:sub(start,i - 1)
+				start = nil
+			end
+			i = i + 1
+			start = i
+			while i <= #txt do
+				local c2 = txt:sub(i,i)
+				if c2 == c then
+					args[#args + 1] = txt:sub(start,i - 1)
+					start = nil
+					break
+				elseif c2 == "\\" then
+					i = i + 1
+				end
+				i = i + 1
+			end
+			if start then warning("unclosed " .. c); return nil end
+		else
+			if c == '\\' then
+				i = i + 1
+				if i > #txt then warning("unclosed \\"); return nil end
+			end
+			if not start then
+				start = i
+			end
+		end
+		i = i + 1
+	end
+	if start then
+		args[#args + 1] = txt:sub(start,i - 1)
+		start = nil
+	end
+
+	return args
+end
+
+local function parseArgs2(txt)
+	local args = {}
 	local inSingleQuote = false
 	for i in txt:gmatch("%S+") do
 		if inSingleQuote then
@@ -440,34 +544,237 @@ local function parseArgs(txt)
 		end
 		if i:find("'") == i:len() then
 			inSingleQuote = false
-			args[#args] = args[#args]:sub(1, args[#args]:len() - 1):gsub("'", "\\'")
+			args[#args] = args[#args]:sub(1, args[#args]:len() - 1)
 		end
 		-- single quote on its own will break this most likely.
+	end
+
+	debugPrint("Args:")
+	for i,v in pairs(args) do
+		debugPrint(i,v)
 	end
 
 	return args
 end
 
-registerSlashCommand("BIND", {"/bind"}, function() bindLeaderKey() end)
-registerSlashCommand("UNBIND", {"/unbind"}, function() unbindLeaderKey() end)
-registerSlashCommand("LEADERKEY_MAP", {"/lkmap"},
+local macrotype = "macro"
+local spelltype = "spell"
+local function SlashCommandMapBind(bindingsTree, txt)
+	local args = parseArgs(txt)
+	if not args then return end
+	local type = args[1]
+	local name = args[2]
+	if name == "_" then name = nil end
+	local contents = args[3]
+	local keySequence = slice(args, 4)
+
+	local node
+	if type == macrotype then
+		node = CreateMacroNode(name, contents)
+	elseif type == spelltype then
+		node = CreateSpellNode(name, contents)
+		ViragDevTool_AddData(node, "bla")
+	else
+		warning("Unknown type \"" .. type .. "\"")
+		return
+	end
+
+	LeaderKey.CreateBinding(bindingsTree, node, keySequence)
+	UpdateKeybinds()
+	info("Created bind " .. table.concat(keySequence, " ") .. " to " .. name)
+end
+
+local function SlashCommandMapUnbind(bindingsTree, txt)
+	local keySequence = parseArgs(txt)
+	if not keySequence then return end
+
+	LeaderKey.DeleteNode(bindingsTree, keySequence)
+	UpdateKeybinds()
+	info("Deleted node " .. table.concat(keySequence, " ") .. " (or, it didn't exist in the first place)")
+end
+
+local function SlashCommandNameNode(bindingsTree, txt)
+	local args = parseArgs(txt)
+	if not args then return end
+	local name = args[1] or "nil"
+	local keySequence = slice(args, 2)
+
+	local successful = LeaderKey.NameNode(bindingsTree, name, keySequence)
+	if successful then
+		info("Named node " .. table.concat(keySequence, " ") .. " to " .. name)
+	end
+	UpdateKeybinds()
+end
+
+registerSlashCommand("LEADERKEY_ACCOUNT_MAP", {"/lkamap"},
                      function(txt, editbox)
-								local args = parseArgs(txt)
-								--old_CreateBind(args[1], unpack(slice(args, 2)))
-								local node = CreateNode(nil, MACRO)
-								node.macro = args[1]
-								AddBind(node, slice(args, 2))
+								SlashCommandMapBind(LeaderKey.GetAccountBindingsTree(), txt)
+                     end
+)
+registerSlashCommand("LEADERKEY_CLASS_MAP", {"/lkclmap"},
+                     function(txt, editbox)
+								SlashCommandMapBind(LeaderKey.GetCurrentClassBindingsTree(), txt)
+                     end
+)
+registerSlashCommand("LEADERKEY_SPEC_MAP", {"/lksmap"},
+                     function(txt, editbox)
+								SlashCommandMapBind(LeaderKey.GetCurrentSpecBindingsTree(), txt)
+                     end
+)
+registerSlashCommand("LEADERKEY_ACCOUNT_UNMAP", {"/lkaunmap"},
+                     function(txt, editbox)
+								SlashCommandMapUnbind(LeaderKey.GetAccountBindingsTree(), txt)
 								UpdateKeybinds()
                      end
 )
+registerSlashCommand("LEADERKEY_CLASS_UNMAP", {"/lkclunmap"},
+                     function(txt, editbox)
+								SlashCommandMapUnbind(LeaderKey.GetCurrentClassBindingsTree(), txt)
+                     end
+)
+registerSlashCommand("LEADERKEY_SPEC_UNMAP", {"/lksunmap"},
+                     function(txt, editbox)
+								SlashCommandMapUnbind(LeaderKey.GetCurrentSpecBindingsTree(), txt)
+                     end
+)
+registerSlashCommand("LEADERKEY_ACCOUNT_NAME", {"/lkaname"},
+                     function(txt, editbox)
+								SlashCommandNameNode(LeaderKey.GetAccountBindingsTree(), txt)
+                     end
+)
+registerSlashCommand("LEADERKEY_CLASS_NAME", {"/lkclname"},
+                     function(txt, editbox)
+								SlashCommandNameNode(LeaderKey.GetCurrentClassBindingsTree(), txt)
+                     end
+)
+registerSlashCommand("LEADERKEY_SPEC_NAME", {"/lksname"},
+                     function(txt, editbox)
+								SlashCommandNameNode(LeaderKey.GetCurrentSpecBindingsTree(), txt)
+                     end
+)
+-- Delete this binding in the highest priority table. TODO.
 registerSlashCommand("LEADERKEY_UNMAP", {"/lkunmap"},
                      function(txt, editbox)
+								error("NYI")
 								local args = parseArgs(txt)
-								--old_DeleteNode(unpack(args))
-								DeleteNode(args)
-								UpdateKeybinds()
                      end
 )
+registerSlashCommand("LEADERKEY_PRINT_CURRENT", {"/lkpc"},
+                     function(txt, editbox)
+								LeaderKey.PrintCurrentBinds(LeaderKey.GetCurrentBindingsTree())
+                     end
+)
+
+-- ### public api.
+
+-- TODO maybe remove - is this useful?
+function LeaderKey.GetCurrentBindingsTree()
+	return CurrentBindings
+end
+
+function LeaderKey.UpdateCurrentBindings()
+	UpdateKeybinds()
+end
+
+function LeaderKey.CreateBinding(bindingsTree, node, keySequence)
+	-- TODO check existance of binding? Could also do that somewhere else.
+
+	bindingsTree:AddBind(node, keySequence)
+
+	--UpdateKeybinds() -- TODO do I want this here?
+end
+
+function LeaderKey.DeleteNode(bindingsTree, keySequence)
+	bindingsTree:DeleteNode(keySequence)
+
+	--UpdateKeybinds() -- TODO do I want this here?
+end
+
+function LeaderKey.NameNode(bindingsTree, name, keySequence)
+	return bindingsTree:NameNode(name, keySequence)
+end
+
+function LeaderKey.GetAccountBindingsTree()
+	if LeaderKeyData.accountBindings then
+		LeaderKeyData.accountBindings = BindingsTree:cast(LeaderKeyData.accountBindings)
+	else
+		LeaderKeyData.accountBindings = BindingsTree:new()
+	end
+	return LeaderKeyData.accountBindings
+end
+
+local ALL_SPECS = "ALL"
+function LeaderKey.GetSpecBindingsTree(class, spec)
+	LeaderKeyData.classBindings[class] = LeaderKeyData.classBindings[class] or {}
+	if LeaderKeyData.classBindings[class][spec] then
+		LeaderKeyData.classBindings[class][spec] = BindingsTree:cast(LeaderKeyData.classBindings[class][spec])
+	else
+		LeaderKeyData.classBindings[class][spec] = BindingsTree:new()
+	end
+	return LeaderKeyData.classBindings[class][spec]
+end
+
+function LeaderKey.GetClassBindingsTree(class)
+	return LeaderKey.GetSpecBindingsTree(class, ALL_SPECS)
+end
+
+function LeaderKey.GetCurrentSpecBindingsTree()
+	return LeaderKey.GetSpecBindingsTree(select(2, UnitClass("player")), GetSpecialization()) -- 2 is the localization-independent name.
+end
+
+function LeaderKey.GetCurrentClassBindingsTree()
+	return LeaderKey.GetClassBindingsTree(select(2, UnitClass("player"))) -- 2 is the localization-independent name.
+end
+
+function LeaderKey.PrintBinds(bindingsTree)
+	warning("Account bindings:")
+	printBindings(LeaderKey.GetAccountBindingsTree)
+end
+
+local function printCurrentBindsHelper(bindingsTree, checkAgainst, sequence)
+	sequence = sequence or ""
+	for key,node in pairs(bindingsTree.bindings) do
+		local newSequence = sequence .. key .. " "
+		if node.type ~= SUBMENU then
+			local str = ""
+			for bindingsName,otherBindingsTree in pairs(checkAgainst) do
+				local split = {}
+				for i in newSequence:gmatch("%S+") do
+					split[#split + 1] = i
+				end
+				--debugPrint("looking at binding " .. table.concat(split, " ") .. " for tree " .. bindingsName)
+				local otherNode = otherBindingsTree:GetNode(split) -- TODO can't use getnode - need something like "bindingconflicts".
+				if otherNode then
+					str = str .. " Overriden by " .. bindingsName
+				end
+			end
+			if str:len() > 0 then
+				str = "|cFFFF0000 (" .. str:sub(2, str:len()) .. ")"
+			end
+			warning(newSequence:sub(1, newSequence:len() - 1) .. ":", (node.name or "nil") .. str)
+		else
+			printCurrentBindsHelper(node, checkAgainst, newSequence)
+		end
+	end
+end
+
+function LeaderKey.PrintCurrentBinds()
+	warning("Account bindings:")
+	printCurrentBindsHelper(LeaderKey.GetAccountBindingsTree(), {["Current Class"] = LeaderKey.GetCurrentClassBindingsTree(), ["Current Spec"] = LeaderKey.GetCurrentSpecBindingsTree()})
+	warning("Class bindings:")
+	printCurrentBindsHelper(LeaderKey.GetCurrentClassBindingsTree(), {["Current Spec"] = LeaderKey.GetCurrentSpecBindingsTree})
+	warning("Spec bindings:")
+	printCurrentBindsHelper(LeaderKey.GetCurrentSpecBindingsTree(), {})
+end
+
+-- NYI
+--[[
+function LeaderKey.GetCharacterBindingsTree(node, keySequence)
+	LeaderKeyCharacterData = LeaderKeyCharacterData or {}
+	LeaderKeyCharacterData.bindings = LeaderKeyCharacterData.bindings or BindingsTable:new()
+	return LeaderKeyCharacterData.bindings
+end
+--]]
 
 -- ### Register event handlers
 local function registerEventHandlers(events)
@@ -481,11 +788,35 @@ local function registerEventHandlers(events)
 end
 
 local events = {}
+-- TODO remove (debug)
 function events:PLAYER_ENTERING_WORLD(...)
 	if ViragDevTool_AddData then
-		ViragDevTool_AddData(LeaderKey.bindings, "LKMAP")
+		ViragDevTool_AddData(ViragCurrentBindingsPointer.bindings, "LKMAP")
+		ViragDevTool_AddData(LeaderKeyData.accountBindings, "LKMAP_ACCOUNT")
+		ViragDevTool_AddData(LeaderKeyData.classBindings, "LKMAP_CLASS")
 	end
 end
+do
+	local addonIsLoaded = false
+	function events:ADDON_LOADED(...)
+		if addonIsLoaded then return end
+
+		local debugWipe = false
+		if debugWipe then
+			LeaderKeyData = nil
+		end
+
+		LeaderKeyData = LeaderKeyData or {}
+		LeaderKeyData.classBindings = LeaderKeyData.classBindings or {}
+		LeaderKey.UpdateCurrentBindings()
+		addonIsLoaded = true
+	end
+end
+function events:PLAYER_SPECIALIZATION_CHANGED(...)
+	debugPrint("PLAYER_SPECIALIZATION_CHANGED new spec", GetSpecialization())
+	LeaderKey.UpdateCurrentBindings()
+end
+
 registerEventHandlers(events)
 
 -- Test code. TODO remove this eventually.
@@ -501,184 +832,8 @@ do
 			value4 = true,
 		},
 	}
-	registerSlashCommand("TEST", {"/test"}, function() secureTableInsert(AfterLeaderKeyHandlerFrame, "testTable", testTable) end)
+	registerSlashCommand("TEST", {"/test"}, function(txt) local bla = parseArgs(txt); if not bla then print("returned nil"); return end; for i,v in pairs(bla) do warning(i,v) end end)
 end
 
 registerSlashCommand("RL", {"/rl"}, SlashCmdList["RELOAD"])
-
-local function rsc(id,  txt)
-	SlashCmdList[id](txt, nil)
-end
-
--- ### set up some test keybinds.
-do
-	local function kssplit(str)
-		local split = {}
-		for i in str:gmatch("%S+") do
-			split[#split + 1] = i
-		end
-		return split
-	end
-
-	do
-		local result = kssplit('A B')
-		assert(result[1] == 'A')
-		assert(result[2] == 'B')
-	end
-
-	local actual_GetNode = GetNode
-	local function GetNode(str)
-		return actual_GetNode(kssplit(str))
-	end
-	local actual_GetParentNode = GetParentNode
-	local function GetParentNode(str)
-		return actual_GetParentNode(kssplit(str))
-	end
-	local actual_CreateBind = AddBind
-	local function AddBind(str, node)
-		node = node or CreateNode(nil, MACRO)
-		actual_CreateBind(node, kssplit(str))
-	end
-	local actual_NameNode = NameNode
-	local function NameNode(str, name)
-		actual_NameNode(name, kssplit(str))
-	end
-	local actual_DeleteNode = DeleteNode
-	local function DeleteNode(str)
-		actual_DeleteNode(kssplit(str))
-	end
-
-	-- Test GetNode and GetParentNode.
-	LeaderKey = {
-		name = "Root node",
-		type = SUBMENU,
-		bindings = {
-			A = { name = "A", type = SUBMENU, bindings = {
-				B = { name = "B", type = SUBMENU, bindings = {
-					C = { name = "C", type = MACRO },
-				}},
-				D = { name = "D", type = SUBMENU, bindings = {
-					E = { name = "E", type = MACRO },
-				}},
-			}},
-			F = { name = "F", type = MACRO, },
-		}
-	}
-	assert(GetNode('') == LeaderKey)
-	assert(GetParentNode('A') == LeaderKey)
-	assert(GetParentNode('') == LeaderKey)
-	assert(GetNode('A') == LeaderKey.bindings.A)
-	assert(GetNode('A B') == LeaderKey.bindings.A.bindings.B)
-	assert(GetNode('A B C') == LeaderKey.bindings.A.bindings.B.bindings.C)
-	assert(GetNode('A D') == LeaderKey.bindings.A.bindings.D)
-	assert(GetNode('A D E') == LeaderKey.bindings.A.bindings.D.bindings.E)
-	assert(GetNode('F') == LeaderKey.bindings.F)
-	assert(GetParentNode('A B') == LeaderKey.bindings.A)
-	assert(GetParentNode('A B C') == LeaderKey.bindings.A.bindings.B)
-	assert(GetParentNode('A D') == LeaderKey.bindings.A)
-	assert(GetParentNode('A D E') == LeaderKey.bindings.A.bindings.D)
-	assert(GetParentNode('F') == LeaderKey)
-	assert(not GetNode('G'))
-	assert(not GetNode('A B G'))
-	assert(not GetNode('A B C G'))
-	--assert(not GetParentNode('G')) -- I'll let this one go.
-	--assert(not GetParentNode('A B G')) -- I'll let this one go.
-	--assert(not GetParentNode('A B C G')) -- I'll let this one go.
-	assert(not GetParentNode('A B C G H'))
-
-	assert(GetNode('') == LeaderKey)
-
-	-- Test AddBind.
-	CreateBindingsTree()
-	local node = CreateMacro("testMacro", "/notacommand")
-	AddBind('A B', node)
-	assert(GetNode('A B') == node)
-	AddBind('A', node)
-	assert(not GetNode('A B'))
-	assert(GetNode('A') == node)
-	AddBind('A B C', node)
-	assert(GetNode('A B C') == node)
-
-	-- Test.
-	CreateBindingsTree()
-	AddBind('A B C')
-	NameNode('A', 'A')
-	NameNode('A B', 'B')
-	AddBind('A E')
-	NameNode('A E', 'E')
-
-	-- Test bind deletion.
-	CreateBindingsTree()
-	AddBind('A B C')
-	AddBind('A B D')
-	DeleteNode('A B C')
-	assert(not GetNode('A B C'))
-	assert(GetNode('A B D'))
-
-	-- test non-sequence bind deletion.
-	CreateBindingsTree()
-	AddBind('A')
-	DeleteNode('A')
-	assert(not GetNode('A'))
-
-	-- Tests deletion of orphaned parents.
-	CreateBindingsTree()
-	AddBind('A B C')
-	NameNode('A', 'A')
-	NameNode('A B', 'B')
-	AddBind('A E')
-	DeleteNode('A B C')
-	assert(GetNode('A E'))
-	assert(not GetNode('A B'))
-	assert(not GetNode('A B C'))
-
-	assert(not GetNode('A B'))
-	-- Tests deletion of original bind.
-	CreateBindingsTree()
-	AddBind('A B C')
-	DeleteNode('A B C')
-	assert(not GetNode('A'))
-
-function timetest()
-	local startTime = GetTime()
-	local arr = {'A', 'B', 'C', 'D', 'E', 'F', 'G', "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
-	CreateBindingsTree()
-	for _,a in pairs(arr) do
-		for _,b in pairs(arr) do
-			for _,c in pairs(arr) do
-				for _,d in pairs(arr) do
-					AddBind("K " .. a .. " " .. b .. " " .. c .. " " .. d, CreateMacro("bla", "bla"))
-				end
-			end
-		end
-	end
-	local t = GetTime()
-	print(startTime, t)
-	local elapsed = t - startTime
-	print("Time to create", #arr * #arr * #arr, "bindings:", elapsed)
-	startTime = GetTime()
-	--UpdateKeybinds()
-	elapsed = GetTime() - startTime
-	print("Time to update", #arr * #arr * #arr, "bindings:", elapsed)
-end
-	-- Set up some nice defaults for ingame testing.
-	CreateBindingsTree()
-	AddBind('K T K', CreateMacro("Katy (Mailbox, 10 mins)", "/use Katy's Stampwhistle"))
-	--AddBind('K C', CreateMacro("Pyroblast", "/use Pyroblast"))
-	--AddBind('K B', CreateMacro("Fireball", "/use Fireball"))
-	AddBind('K M S L', CreateMacro("Swift Lovebird", "/use Swift Lovebird"))
-	AddBind('K C M', CreateMacro("Mounts", "/script ToggleCollectionsJournal(1)"))
-	AddBind('K C P', CreateMacro("Pets", "/script ToggleCollectionsJournal(2)"))
-	AddBind('K C T', CreateMacro("Toys", "/script ToggleCollectionsJournal(3)"))
-	AddBind('K C H', CreateMacro("Heirlooms", "/script ToggleCollectionsJournal(4)"))
-	AddBind('K C A', CreateMacro("Appearances", "/script ToggleCollectionsJournal(5)"))
-	NameNode('K', "K menu")
-	NameNode('K C', "Collections")
-	NameNode('K M', "Mounts")
-	NameNode('K T', "Toys")
-
-	UpdateKeybinds()
-
-end
---rsc("LEADERKEY_MAP", "'/script ToggleCollectionsJournal(1)' K C M")
 
