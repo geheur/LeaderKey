@@ -1,4 +1,6 @@
-Create mappings:
+## Binding keys
+
+###Create mappings:
 
 `/lkamap <type> <name> <macro text or spell name> [<key1>, <key2>, ...]`
 
@@ -13,21 +15,22 @@ Create mappings:
 Example: `/lkamap macro Appearances "/script ToggleCollectionsJournal(5)" K C A`.
 
 
-Unbind mapping:
+###Unbind mapping:
 
 `/lkaunmap [<key1>, <key2>, ...]`
 
 
-Name a submenu:
+###Name a submenu:
+
 `/lkaname <name> [<key1>, <key2>, ...]`
 
 
-Binding Scopes:
+##Binding Scopes:
 
 You can create class-specific and spec-specific binds, using variants of the above commands. Class binds: `/lkclmap`, `/lkclunmap`, `/lkclname`. Spec binds: `/lksmap`, `/lksunmap`, `/lksname`.
 
 
-Other notes:
+##Other notes:
 
 You can cancel a sequence in progress with ESCAPE.
 
