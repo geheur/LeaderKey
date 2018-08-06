@@ -25,50 +25,43 @@ end
 
 local function tableIsEmpty(tbl)
 	for i,v in pairs(tbl) do
-		return true
+		return false
 	end
-	return false
+	return true
 end
 
 -- ### secure table insert
 --[[
--- TODO does not support tables with nodes with more than one parent.
--- TODO does not support inserting into anything other than the global namespace, _G. Could take another argument that is a string and gets inserted directly into the snippet. It would default to _G.
 Serializes a value, for transfer to the restricted environment using a function like secureTableInsert. Most useful for tables, but works with any variable, provided that it is not (or if it is a table, does not contain variables) of type functions, userdata, or thread.
 The resulting value will be a string containing instructions to rebuild the value in a comma-separated list.
 ]]
 local secureTableInsert do
-	local function serializeValue(value)
-		if type(value) == "string" then
-			--return ("%q"):format(value)
-			return value
-		else -- number, boolean, nil
-			return tostring(value)
-		end
-	end
+	-- TODO does not support tables with nodes with more than one parent (Graphs that are not trees). Will hang if you pass in a cyclic graph.
+	-- TODO does not support inserting into anything other than the global namespace, _G. Could take another argument that is a string and gets inserted directly into the snippet. It would default to _G.
 	local splitvalue = 21 -- "negative acknowledge" - no clue what it does, but I don't expect anyone to use it.
 	local splitchar = string.char(splitvalue)
-	local serializeVariableHelper
-	local function serializeTableContents(table)
+
+	local serializeTableContents, serializeVariable
+	function serializeTableContents(table)
 		local serializedContents = ""
 		for i,v in pairs(table) do
-			local serializedValue = serializeVariableHelper(i, v)
+			local serializedValue = serializeVariable(i, v)
 			if serializedValue then
 				serializedContents = serializedContents .. serializedValue .. splitchar
 			end
 		end
 		return serializedContents
 	end
-	function serializeVariableHelper(name, value)
+	function serializeVariable(name, value)
 		value = value or _G[name]
 		local valueType = type(value)
 		if valueType == "function" or valueType == "userdata" or valueType == "thread" then
 			--return nil
 			error("key " .. name .. " is not serializable into the secure environment because its value is of type " .. valueType)
 		elseif valueType == "table" then
-			return string.format("TABLE" .. splitchar .. "%s" .. splitchar .. "%sENDTABLE", serializeValue(name), serializeTableContents(value))
+			return string.format("TABLE" .. splitchar .. "%s" .. splitchar .. "%sENDTABLE", tostring(name), serializeTableContents(value))
 		else -- string, number, boolean
-			return string.format("VALUE" .. splitchar .. "%s" .. splitchar .. "%s", serializeValue(name), serializeValue(value))
+			return string.format("VALUE" .. splitchar .. "%s" .. splitchar .. "%s", tostring(name), tostring(value))
 		end
 	end
 	local escapeForSecureEnvironment do
@@ -76,11 +69,6 @@ local secureTableInsert do
 		function escapeForSecureEnvironment(s)
 			return (s:gsub("[{}u]", r))
 		end
-	end
-	local function serializeVariable(name, value)
-		--return ("%q"):format(value)
-		--return escapeForSecureEnvironment(serializeVariableHelper(name, value))
-		return escapeForSecureEnvironment(("%q"):format(serializeVariableHelper(name, value)))
 	end
 	function secureTableInsert(secureHeader, varName, table)
 		local snippet = [[self:Run([=[
@@ -134,16 +122,7 @@ local secureTableInsert do
 				end
 			end
 		--]=],%s)]]
-		local serializedVar = serializeVariable(varName, table)
-		--debugPrint("serializedVar", serializedVar)
-		snippet = string.format(snippet, serializedVar) -- TODO change back.
-
-		debugPrint("snippet length:", snippet:len())
-		local count = 0
-		for i in string.gmatch(serializedVar, ",") do
-			count = count + 1
-		end
-		debugPrint("num commas:", count)
+		snippet = string.format(snippet, escapeForSecureEnvironment(("%q"):format(serializeVariable(varName, table))))
 
 		secureHeader:Execute(snippet)
 	end
@@ -152,14 +131,19 @@ end
 -- ### start of addon code
 LeaderKey = {}
 
+local function info(...)
+	local bla = slice({...}, 2)
+	print("[LeaderKey]: " .. select(1, ...), unpack(bla))
+end
+
 local function warning(...)
 	local bla = slice({...}, 2)
 	print("|cFFFFA500[LeaderKey]:" .. select(1, ...), unpack(bla))
 end
 
-local function info(...)
+local function errorp(...)
 	local bla = slice({...}, 2)
-	print("[LeaderKey]: " .. select(1, ...), unpack(bla))
+	print("|cFFFF0000[LeaderKey]:" .. select(1, ...), unpack(bla))
 end
 
 -- ### Bindings table, and manipulating functions.
@@ -178,10 +162,6 @@ local function CreateMacroNode(name, macro)
 end
 
 local function CreateSpellNode(name, spellName)
-	local name, rank, icon, castTime, minRange, maxRange, spellId = GetSpellInfo(spellName)
-	if not name then
-		error("|cFFFFA500Could not find spell " .. spellName .. ".|r") -- TODO do not error here. Either that or catch it.
-	end
 	return CreateMacroNode(name, '/use ' .. spellName)
 end
 
@@ -397,12 +377,13 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 AfterLeaderKeyHandlerFrame:WrapScript(AfterLeaderKeyHandlerFrame, "OnClick", "self:Run(OnClick, button, down) return true", "print('|cFFFF0000After onclick wrap called.|r') self:SetAttribute('type', nil)") -- TODO why doesn't the after script run?
 LeaderKeyOverrideBindOwner = CreateFrame("BUTTON", "Leader Key Override Bind Owner", nil, "SecureHandlerBaseTemplate")
 
+-- TODO make into method.
 local function CopyInBindingsTree(currentBindingsTree, bindingsTree)
 	for key,node in pairs(bindingsTree.bindings) do
 		local currentNode = currentBindingsTree.bindings[key]
 		if node.type == SUBMENU then
 			if currentNode ~= nil and currentNode.type ~= SUBMENU then
-				print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
+				--print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
 			end
 			if currentNode == nil or currentNode.type ~= SUBMENU then
 				currentBindingsTree.bindings[key] = CreateSubmenu(node.name) -- TODO copy function?
@@ -410,7 +391,7 @@ local function CopyInBindingsTree(currentBindingsTree, bindingsTree)
 			CopyInBindingsTree(currentBindingsTree.bindings[key], node)
 		else
 			if currentNode ~= nil then
-				print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
+				--print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
 			end
 			debugPrint("binding", currentBindingsTree.name or "", key, "to", node.name)
 			currentBindingsTree.bindings[key] = node -- TODO make sure no one changes this node...
@@ -456,7 +437,7 @@ function AfterLeaderKeyHandlerFrame:printOptions(sequenceStr)
 
 	print("|c4aacd3FF#####", (node.name or "nil"), "#####|r")
 
-	if not tableIsEmpty(node.bindings) then
+	if tableIsEmpty(node.bindings) then
 		print("|cFFFF0000No bindings, press escape to quit. This should not happen.|r")
 	end
 
@@ -541,28 +522,49 @@ local function parseArgs(txt)
 		start = nil
 	end
 
+	if debug then
+		for i,v in pairs(args) do
+			print(i,v)
+		end
+	end
+
 	return args
+end
+
+-- TODO usage info for bad command
+
+local function cleanKeySequence(keySequence)
+	for i,v in pairs(keySequence) do
+		keySequence[i] = string.upper(v)
+	end
+	return keySequence
 end
 
 local macrotype = "macro"
 local spelltype = "spell"
 local function SlashCommandMapBind(bindingsTree, txt)
 	local args = parseArgs(txt)
-	if not args then return end
+	if not args or not args[4] then errorp("invalid arguments"); return end
+
 	local type = args[1]
 	local name = args[2]
 	if name == "_" then name = nil end
-	local contents = args[3]
-	local keySequence = slice(args, 4)
+	local contents = args[3]:gsub("\\n","\n")
+	local keySequence = cleanKeySequence(slice(args, 4))
 
 	local node
 	if type == macrotype then
 		node = CreateMacroNode(name, contents)
 	elseif type == spelltype then
-		node = CreateSpellNode(name, contents)
+		local spellName, rank, icon, castTime, minRange, maxRange, spellId = GetSpellInfo(contents)
+		if not spellName then
+			errorp("|cFFFFA500Could not find spell " .. spellName .. ".|r")
+			return
+		end
+		node = CreateSpellNode(name, spellName)
 		ViragDevTool_AddData(node, "bla")
 	else
-		warning("Unknown type \"" .. type .. "\"")
+		errorp("Unknown type \"" .. type .. "\"")
 		return
 	end
 
@@ -572,8 +574,9 @@ local function SlashCommandMapBind(bindingsTree, txt)
 end
 
 local function SlashCommandMapUnbind(bindingsTree, txt)
-	local keySequence = parseArgs(txt)
-	if not keySequence then return end
+	local args = parseArgs(txt)
+	if not args or not args[1] then errorp("invalid arguments"); return end
+	local keySequence = cleanKeySequence(args)
 
 	LeaderKey.DeleteNode(bindingsTree, keySequence)
 	UpdateKeybinds()
@@ -582,9 +585,9 @@ end
 
 local function SlashCommandNameNode(bindingsTree, txt)
 	local args = parseArgs(txt)
-	if not args then return end
+	if not args or not args[1] then errorp("invalid arguments"); return end
 	local name = args[1] or "nil"
-	local keySequence = slice(args, 2)
+	local keySequence = cleanKeySequence(slice(args, 2))
 
 	local successful = LeaderKey.NameNode(bindingsTree, name, keySequence)
 	UpdateKeybinds()
@@ -640,12 +643,14 @@ registerSlashCommand("LEADERKEY_SPEC_NAME", {"/lksname"},
                      end
 )
 -- Delete this binding in the highest priority table. TODO.
+--[[
 registerSlashCommand("LEADERKEY_UNMAP", {"/lkunmap"},
                      function(txt, editbox)
 								error("NYI")
 								local args = parseArgs(txt)
                      end
 )
+--]]
 registerSlashCommand("LEADERKEY_PRINT_CURRENT", {"/lkpc"},
                      function(txt, editbox)
 								LeaderKey.PrintCurrentBinds(LeaderKey.GetCurrentBindingsTree())
@@ -654,7 +659,6 @@ registerSlashCommand("LEADERKEY_PRINT_CURRENT", {"/lkpc"},
 
 -- ### public api.
 
--- TODO maybe remove - is this useful?
 function LeaderKey.GetCurrentBindingsTree()
 	return CurrentBindings
 end
@@ -667,14 +671,10 @@ function LeaderKey.CreateBinding(bindingsTree, node, keySequence)
 	-- TODO check existance of binding? Could also do that somewhere else.
 
 	bindingsTree:AddBind(node, keySequence)
-
-	--UpdateKeybinds() -- TODO do I want this here?
 end
 
 function LeaderKey.DeleteNode(bindingsTree, keySequence)
 	bindingsTree:DeleteNode(keySequence)
-
-	--UpdateKeybinds() -- TODO do I want this here?
 end
 
 function LeaderKey.NameNode(bindingsTree, name, keySequence)
@@ -717,17 +717,10 @@ function LeaderKey.GetCurrentSpecBindingsTree()
 end
 
 function LeaderKey.GetCurrentClassBindingsTree()
-	local class = select(2, UnitClass("player"))
-	debugPrint("Class:", class) -- TODO remove this.
-	return LeaderKey.GetClassBindingsTree(class) -- 2 is the localization-independent name.
+	return LeaderKey.GetClassBindingsTree(select(2, UnitClass("player"))) -- 2 is the localization-independent name.
 end
 
--- TODO WTF is this?
-function LeaderKey.PrintBinds(bindingsTree)
-	warning("Account bindings:")
-	printBindings(LeaderKey.GetAccountBindingsTree)
-end
-
+-- todo move out of api section.
 local function printCurrentBindsHelper(bindingsTree, checkAgainst, sequence)
 	sequence = sequence or ""
 	for key,node in pairs(bindingsTree.bindings) do
@@ -785,7 +778,6 @@ local function registerEventHandlers(events)
 end
 
 local events = {}
--- TODO remove (debug)
 function events:PLAYER_ENTERING_WORLD(...)
 	if ViragDevTool_AddData and debug then
 		ViragDevTool_AddData(ViragCurrentBindingsPointer.bindings, "LKMAP")
