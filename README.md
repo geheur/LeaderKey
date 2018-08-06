@@ -27,11 +27,11 @@ Example: `/lkamap macro Appearances "/script ToggleCollectionsJournal(5)" K C A`
 
 ## Binding Scopes:
 
-You can create class-specific and spec-specific binds, using variants of the above commands. Class binds: `/lkclmap`, `/lkclunmap`, `/lkclname`. Spec binds: `/lksmap`, `/lksunmap`, `/lksname`.
+You can create class-specific and spec-specific binds for your current class or spec, using variants of the above commands. Class binds: `/lkclmap`, `/lkclunmap`, `/lkclname`. Spec binds: `/lksmap`, `/lksunmap`, `/lksname`.
 
 
 ## Other notes:
 
-You can cancel a sequence in progress with ESCAPE.
+You can cancel a sequence in progress with `ESCAPE`.
 
 You can't disable the chat spam. Sorry! Will add some nice UI later on, I hope.
