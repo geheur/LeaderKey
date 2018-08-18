@@ -504,6 +504,7 @@ function AfterLeaderKeyHandlerFrame:printOptions(sequenceStr)
 		for nextBind,nextNode in pairs(node.bindings) do
 			if nextNode.type == SUBMENU then
 				local text = nextBind .. " -> |c4aacd3FF" .. (nextNode.name or "[no name]") .. "|r"
+
 				local actionFrame = listItems[i]
 				if actionFrame ~= nil then
 					actionFrame.Text:SetText(text)
@@ -536,7 +537,7 @@ local function printBindings(bindingsTree, sequence)
 end
 
 local printCurrentBindings do
-	local function printCurrentBindsHelper(bindingsTree, checkAgainst, sequence)
+local function printCurrentBindsHelper(bindingsTree, checkAgainst, sequence)
 		sequence = sequence or ""
 		for key,node in pairs(bindingsTree.bindings) do
 			local newSequence = sequence .. key .. " "
@@ -861,8 +862,6 @@ do
 	local addonIsLoaded = false
 	function events:ADDON_LOADED(...)
 		if addonIsLoaded then return end
-
-		info("LKM", LeaderKeyMenu)
 
 		local debugWipe = false
 		if debugWipe then
