@@ -22,7 +22,7 @@ CreateBindingsTree()
 -- ### Core keybind setup code.
 AfterLeaderKeyHandlerFrame = CreateFrame("BUTTON", "After Leader Key Handler Frame", nil, "SecureHandlerClickTemplate,SecureActionButtonTemplate")
 
-AfterLeaderKeyHandlerFrame:RegisterForClicks("AnyUp", "AnyDown")
+AfterLeaderKeyHandlerFrame:RegisterForClicks(--[["AnyUp", ]]"AnyDown")
 
 local helmMenuSearchSnippet = [[
 
@@ -200,7 +200,6 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 		local button, down = ...
 		self:CallMethod("debugPrint", button)
 
-		if not down then return end
 		--if not down and button == eatKeyUp then
 			--self:ClearBindings()
 			--eatKeyUp = nil
