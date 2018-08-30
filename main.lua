@@ -200,6 +200,7 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 		local button, down = ...
 		self:CallMethod("debugPrint", button)
 
+		if not down then return end
 		--if not down and button == eatKeyUp then
 			--self:ClearBindings()
 			--eatKeyUp = nil
