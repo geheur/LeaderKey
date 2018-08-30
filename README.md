@@ -34,4 +34,6 @@ You can create class-specific and spec-specific binds for your current class or 
 
 You can cancel a sequence in progress with `ESCAPE`.
 
-You can't disable the chat spam. Sorry! Will add some nice UI later on, I hope.
+## TODO
+
+searchable submenu documentation.

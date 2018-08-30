@@ -1,6 +1,11 @@
--- ### set up some test keybinds.
-if false then
-	local CurrentBindings = LeaderKey.GetCurrentBindingsTree()
+-- ### BindingsTree test
+local BindingsTree = LeaderKey.BindingsTree
+local Node = LeaderKey.BindingsTree.Node
+local Log = LeaderKey.private.Log
+
+if LeaderKey.private.runTests then
+	local Bindings = BindingsTree:new()
+
 	local function rsc(id,  txt)
 		SlashCmdList[id](txt, nil)
 	end
@@ -20,52 +25,50 @@ if false then
 	end
 
 	local function GetNode(str)
-		return CurrentBindings:GetNode(kssplit(str))
+		return Bindings:GetNode(kssplit(str))
 	end
 	local function GetParentNode(str)
-		return CurrentBindings:GetParentNode(kssplit(str))
+		return Bindings:GetParentNode(kssplit(str))
 	end
 	local function AddBind(str, node)
-		node = node or CreateNode(nil, MACRO)
-		CurrentBindings:AddBind(node, kssplit(str))
+		node = node or Node.CreateNode(nil, Node.MACRO)
+		Bindings:AddBind(node, kssplit(str))
 	end
 	local function NameNode(str, name)
-		CurrentBindings:NameNode(name, kssplit(str))
+		Bindings:NameNode(name, kssplit(str))
 	end
 	local function DeleteNode(str)
-		CurrentBindings:DeleteNode(kssplit(str))
+		Bindings:DeleteNode(kssplit(str))
 	end
 
 	-- Test GetNode and GetParentNode.
-	CurrentBindings = {
-		name = "Root node",
-		type = SUBMENU,
-		bindings = {
-			A = { name = "A", type = SUBMENU, bindings = {
-				B = { name = "B", type = SUBMENU, bindings = {
-					C = { name = "C", type = MACRO },
+	Bindings.name = "Root node"
+	Bindings.bindings = {
+			A = { name = "A", type = Node.SUBMENU, bindings = {
+				B = { name = "B", type = Node.SUBMENU, bindings = {
+					C = { name = "C", type = Node.MACRO },
 				}},
-				D = { name = "D", type = SUBMENU, bindings = {
-					E = { name = "E", type = MACRO },
+				D = { name = "D", type = Node.SUBMENU, bindings = {
+					E = { name = "E", type = Node.MACRO },
 				}},
 			}},
-			F = { name = "F", type = MACRO, },
+			F = { name = "F", type = Node.MACRO, },
 		}
-	}
-	assert(GetNode('') == CurrentBindings)
-	assert(GetParentNode('A') == CurrentBindings)
-	assert(GetParentNode('') == CurrentBindings)
-	assert(GetNode('A') == CurrentBindings.bindings.A)
-	assert(GetNode('A B') == CurrentBindings.bindings.A.bindings.B)
-	assert(GetNode('A B C') == CurrentBindings.bindings.A.bindings.B.bindings.C)
-	assert(GetNode('A D') == CurrentBindings.bindings.A.bindings.D)
-	assert(GetNode('A D E') == CurrentBindings.bindings.A.bindings.D.bindings.E)
-	assert(GetNode('F') == CurrentBindings.bindings.F)
-	assert(GetParentNode('A B') == CurrentBindings.bindings.A)
-	assert(GetParentNode('A B C') == CurrentBindings.bindings.A.bindings.B)
-	assert(GetParentNode('A D') == CurrentBindings.bindings.A)
-	assert(GetParentNode('A D E') == CurrentBindings.bindings.A.bindings.D)
-	assert(GetParentNode('F') == CurrentBindings)
+	assert(GetNode('') == Bindings)
+	assert(GetParentNode('A') == Bindings)
+	assert(GetParentNode('') == Bindings)
+	assert(GetNode('A') == Bindings.bindings.A)
+	print(GetNode('A B'))
+	assert(GetNode('A B') == Bindings.bindings.A.bindings.B)
+	assert(GetNode('A B C') == Bindings.bindings.A.bindings.B.bindings.C)
+	assert(GetNode('A D') == Bindings.bindings.A.bindings.D)
+	assert(GetNode('A D E') == Bindings.bindings.A.bindings.D.bindings.E)
+	assert(GetNode('F') == Bindings.bindings.F)
+	assert(GetParentNode('A B') == Bindings.bindings.A)
+	assert(GetParentNode('A B C') == Bindings.bindings.A.bindings.B)
+	assert(GetParentNode('A D') == Bindings.bindings.A)
+	assert(GetParentNode('A D E') == Bindings.bindings.A.bindings.D)
+	assert(GetParentNode('F') == Bindings)
 	assert(not GetNode('G'))
 	assert(not GetNode('A B G'))
 	assert(not GetNode('A B C G'))
@@ -74,11 +77,12 @@ if false then
 	--assert(not GetParentNode('A B C G')) -- I'll let this one go.
 	assert(not GetParentNode('A B C G H'))
 
-	assert(GetNode('') == CurrentBindings)
+	assert(GetNode('') == Bindings)
 
 	-- Test AddBind.
-	CreateBindingsTree()
-	local node = CreateMacro("testMacro", "/notacommand")
+	Bindings = BindingsTree:new()
+
+	local node = Node.CreateMacroNode("testMacro", "/notacommand")
 	AddBind('A B', node)
 	assert(GetNode('A B') == node)
 	AddBind('A', node)
@@ -88,7 +92,7 @@ if false then
 	assert(GetNode('A B C') == node)
 
 	-- Test.
-	CreateBindingsTree()
+	Bindings = BindingsTree:new()
 	AddBind('A B C')
 	NameNode('A', 'A')
 	NameNode('A B', 'B')
@@ -96,7 +100,7 @@ if false then
 	NameNode('A E', 'E')
 
 	-- Test bind deletion.
-	CreateBindingsTree()
+	Bindings = BindingsTree:new()
 	AddBind('A B C')
 	AddBind('A B D')
 	DeleteNode('A B C')
@@ -104,13 +108,13 @@ if false then
 	assert(GetNode('A B D'))
 
 	-- test non-sequence bind deletion.
-	CreateBindingsTree()
+	Bindings = BindingsTree:new()
 	AddBind('A')
 	DeleteNode('A')
 	assert(not GetNode('A'))
 
 	-- Tests deletion of orphaned parents.
-	CreateBindingsTree()
+	Bindings = BindingsTree:new()
 	AddBind('A B C')
 	NameNode('A', 'A')
 	NameNode('A B', 'B')
@@ -122,11 +126,14 @@ if false then
 
 	assert(not GetNode('A B'))
 	-- Tests deletion of original bind.
-	CreateBindingsTree()
+	Bindings = BindingsTree:new()
+	LeaderKey.VDT.Bindings = Bindings
 	AddBind('A B C')
+	Log.debug("bla")
 	DeleteNode('A B C')
 	assert(not GetNode('A'))
 
+--[[
 function timetest()
 	local startTime = GetTime()
 	local arr = {'A', 'B', 'C', 'D', 'E', 'F', 'G', "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"}
@@ -149,24 +156,7 @@ function timetest()
 	elapsed = GetTime() - startTime
 	print("Time to update", #arr * #arr * #arr, "bindings:", elapsed)
 end
-	-- Set up some nice defaults for ingame testing.
-	CreateBindingsTree()
-	AddBind('K T K', CreateMacro("Katy (Mailbox, 10 mins)", "/use Katy's Stampwhistle"))
-	--AddBind('K C', CreateMacro("Pyroblast", "/use Pyroblast"))
-	--AddBind('K B', CreateMacro("Fireball", "/use Fireball"))
-	AddBind('K M S L', CreateMacro("Swift Lovebird", "/use Swift Lovebird"))
-	AddBind('K C M', CreateMacro("Mounts", "/script ToggleCollectionsJournal(1)"))
-	AddBind('K C P', CreateMacro("Pets", "/script ToggleCollectionsJournal(2)"))
-	AddBind('K C T', CreateMacro("Toys", "/script ToggleCollectionsJournal(3)"))
-	AddBind('K C H', CreateMacro("Heirlooms", "/script ToggleCollectionsJournal(4)"))
-	AddBind('K C A', CreateMacro("Appearances", "/script ToggleCollectionsJournal(5)"))
-	NameNode('K', "K menu")
-	NameNode('K C', "Collections")
-	NameNode('K M', "Mounts")
-	NameNode('K T', "Toys")
-
-	LeaderKey.UpdateCurrentKeybinds()
-
+--]]
 	--rsc("LEADERKEY_MAP", "'/script ToggleCollectionsJournal(1)' K C M")
 end
 

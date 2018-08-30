@@ -9,6 +9,9 @@
 
 frames.xml
 
+LeaderKey.lua
 utils.lua
+BindingsTree.lua
 main.lua
+SlashCommands.lua
 test.lua
