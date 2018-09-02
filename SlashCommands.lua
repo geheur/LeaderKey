@@ -82,8 +82,9 @@ local macrotype = "macro"
 local spelltype = "spell"
 local helmtype = "helm"
 local function SlashCommandMapBind(bindingsTree, txt)
+	print("raw slash command argument:", txt)
 	local args = parseArgs(txt)
-	if not args or not args[4] then errorp("invalid arguments"); return end
+	if not args or not args[4] then Log.error("invalid arguments"); return end
 
 	local type = args[1]
 	local name = args[2]
@@ -97,7 +98,7 @@ local function SlashCommandMapBind(bindingsTree, txt)
 	elseif type == spelltype then
 		local spellName, rank, icon, castTime, minRange, maxRange, spellId = GetSpellInfo(contents)
 		if not spellName then
-			errorp("|cFFFFA500Could not find spell " .. spellName .. ".|r")
+			Log.error("|cFFFFA500Could not find spell " .. spellName .. ".|r")
 			return
 		end
 		node = Node.CreateSpellNode(name, spellName)
@@ -105,7 +106,7 @@ local function SlashCommandMapBind(bindingsTree, txt)
 	elseif type == helmtype then
 		node = Node.CreateHelmSubmenu(name)
 	else
-		errorp("Unknown type \"" .. type .. "\"")
+		Log.error("Unknown type \"" .. type .. "\"")
 		return
 	end
 
@@ -116,7 +117,7 @@ end
 
 local function SlashCommandMapUnbind(bindingsTree, txt)
 	local args = parseArgs(txt)
-	if not args or not args[1] then errorp("invalid arguments"); return end
+	if not args or not args[1] then Log.error("invalid arguments"); return end
 	local keySequence = cleanKeySequence(args)
 
 	LeaderKey.DeleteNode(bindingsTree, keySequence)
@@ -126,7 +127,7 @@ end
 
 local function SlashCommandNameNode(bindingsTree, txt)
 	local args = parseArgs(txt)
-	if not args or not args[1] then errorp("invalid arguments"); return end
+	if not args or not args[1] then Log.error("invalid arguments"); return end
 	local name = args[1] or "nil"
 	local keySequence = cleanKeySequence(slice(args, 2))
 
@@ -196,4 +197,158 @@ registerSlashCommand("LEADERKEY_PRINT_CURRENT", {"/lkpc"},
 								printCurrentBindings(LeaderKey.GetCurrentBindingsTree())
                      end
 )
+
+function LeaderKey.loadstuff()
+	local cmds = {
+	-- Collectionts
+	[[macro 'Mounts' '/script ToggleCollectionsJournal(1) MountJournalSearchBox:SetFocus()' K C M]],
+	[[macro "Pets" "/script ToggleCollectionsJournal(2) PetJournalSearchBox:SetFocus()" K C P]],
+	[[macro "Toys" "/script ToggleCollectionsJournal(3) ToyBox.searchBox:SetFocus()" K C T]],
+	[[macro "Heirlooms" "/script ToggleCollectionsJournal(4)" K C H]],
+	[[macro "Appearances" "/script ToggleCollectionsJournal(5)" K C A]],
+
+	-- Mounts
+	[[helm "Mounts" _ K M]],
+	[[macro "Astral Cloud Serpent" "/cast Astral Cloud Serpent" K M 1]],
+	[[macro "Mimiron's Head" "/cast Mimiron's Head" K M 2]],
+	[[macro "Fire Dog" "/cast Antoran Charhound" K M 3]],
+	[[macro "Shadow Dog" "/cast Antoran Gloomhound" K M 4]],
+	[[macro "Kite" "/castrandom Pandaren Kite, Jade Pandaren Kite" K M 5]],
+	[[macro "Firehawk" "/cast Pureblood Fire Hawk" K M 6]],
+	[[macro "Shadowhawk" "/cast Corrupted Fire Hawk" K M 7]],
+	[[macro "Headless Horseman's Mount" "/cast Headless Horseman's Mount" K M 8]],
+	[[macro "Anzu" "/cast Raven Lord" K M 9]],
+	[[macro "Cloud" "/cast Red Flying Cloud" K M 10]],
+	[[macro "Pink bird" "/cast Swift Lovebird" K M 11]],
+	[[macro "Dreamrunner" "/cast Wild Dreamrunner" K M 12]],
+
+	-- Pets
+	[[macro "Tuskarr Kite" "/summonpet Tuskarr Kite" P T]],
+
+	[[macro "Naked Set" "/equipset Naked" K E]],
+
+	-- Dungeon Journal
+	[[macro "Toggle Journal" "/script ToggleEncounterJournal();" K J J]],
+	[[macro Vanilla "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button1" K J R V]],
+	[[macro "TBC" "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button2" K J R T]],
+	[[macro "TBC" "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button2" K J R B]],
+	[[macro Wrath "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button3" K J R W]],
+	[[macro Cataclysm "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button4" K J R C]],
+	[[macro Mists "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button5" K J R M]],
+	[[macro Warlords "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button6" K J R D]],
+	[[macro Legion "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button7" K J R L]],
+	[[macro BfA "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectRaidTab\n/click DropDownList1Button8" K J R B]],
+	[[macro Vanilla "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button1" K J D V]],
+	[[macro "TBC" "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button2" K J D T]],
+	[[macro "TBC" "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button2" K J D B]],
+	[[macro Wrath "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button3" K J D W]],
+	[[macro Cataclysm "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button4" K J D C]],
+	[[macro Mists "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button5" K J D M]],
+	[[macro Warlords "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button6" K J D D]],
+	[[macro Legion "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button7" K J D L]],
+	[[macro BfA "/script ToggleEncounterJournal(); ShowUIPanel(EncounterJournal)\n/click EncounterJournalInstanceSelectDungeonTab\n/click DropDownList1Button8" K J D B]],
+
+	[[macro "Group Finder" "/script PVEFrame_ToggleFrame()" K I]],
+	[[macro "Communities" "/script ToggleGuildFrame()" K O]],
+	[[macro "Guild" "/guildroster" K G]],
+	[[macro "Achievements" "/script ToggleAchievementFrame()" K A]],
+	[[macro "Spellbook" "/script ToggleSpellBook(BOOKTYPE_SPELL)" K P]],
+	[[macro "Talents" "/script ToggleTalentFrame(2)" K N]],
+	[[macro "Close Windows" "/script CloseAllWindows()" K E]],
+
+	[[macro "Katy (Mailbox 10 mins)" "/use Katy's Stampwhistle" K T K]],
+
+	[[macro "Hearthstone" "/use The Innkeeper's Daughter" K T H]],
+	[[macro "Garrison Hearthstone" "/use Garrison Hearthstone" K T G]],
+	[[macro "Dalaran Hearthstone" "/use Dalaran Hearthstone" K T D]],
+	[[macro "Whistle" "/use Flight Master's Whistle" K T W]],
+
+	[[macro /fstack /fstack K D F]],
+	[[macro /reload /reload K D R]],
+	[[macro /logout /logout K D L]],
+	[[macro "/vuhdo opt" "/vuhdo opt" K D V]],
+	[[macro "Table Attributes" "/fstack\n/fstack\n/script MyTad()" K D T]],
+	[[macro "Table Attributes" "/fstack\n/fstack\n/script local f = TableAttributeDisplay f.LinesScrollFrame:SetSize(935, 400); f:SetSize(1000, 500); f.HighlightButton:SetChecked(true) f:InspectTable(PlayerTalentFrameTalents); f:Show()" K D T]],
+
+	[[macro Star "/script local n = 1 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R S]],
+	[[macro Circle "/script local n = 2 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R C]],
+	[[macro Diamond "/script local n = 3 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R D]],
+	[[macro Triangle "/script local n = 4 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R T]],
+	[[macro Moon "/script local n = 5 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R A]],
+	[[macro Square "/script local n = 6 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R Q]],
+	[[macro Cross "/script local n = 7 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R X]],
+	[[macro Skull "/script local n = 8 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R W]],
+	[[macro Clear "/script local t='target' local n = GetRaidTargetIndex(t) if n~=nil then SetRaidTarget(t, n) end" NUMPADMINUS R E]],
+	[[macro Star "/wm 1" NUMPADMINUS R SHIFT-S]],
+	[[macro Circle "/wm 2" NUMPADMINUS R SHIFT-C]],
+	[[macro Diamond "/wm 3" NUMPADMINUS R SHIFT-D]],
+	[[macro Triangle "/wm 4" NUMPADMINUS R SHIFT-T]],
+	[[macro Moon "/wm 5" NUMPADMINUS R SHIFT-A]],
+	[[macro Square "/wm 6" NUMPADMINUS R SHIFT-Q]],
+	[[macro Cross "/wm 7" NUMPADMINUS R SHIFT-X]],
+	[[macro Skull "/wm 8" NUMPADMINUS R SHIFT-W]],
+
+	[[macro Star "/cwm 1" NUMPADMINUS R R S]],
+	[[macro Circle "/cwm 2" NUMPADMINUS R R C]],
+	[[macro Diamond "/cwm 3" NUMPADMINUS R R D]],
+	[[macro Triangle "/cwm 4" NUMPADMINUS R R T]],
+	[[macro Moon "/cwm 5" NUMPADMINUS R R A]],
+	[[macro Square "/cwm 6" NUMPADMINUS R R Q]],
+	[[macro Cross "/cwm 7" NUMPADMINUS R R X]],
+	[[macro Skull "/cwm 8" NUMPADMINUS R R W]],
+	[[macro Skull "/cwm all" NUMPADMINUS R R E]],
+
+	[[macro "Addon List" "/script ShowUIPanel(AddonList)" K L A]],
+	}
+
+	local nameCmds = {
+	[["Raid Markers" NUMPADMINUS R]],
+	[[Debug K D]],
+	[[Teleports K T]],
+	[["Toys" K T]],
+	[[Dungeon K J D]],
+	[[Raid K J R]],
+	[["Dungeon Journal" K J]],
+	[["Pets" P]],
+	[[Collections K C]],
+	[["Clear Marker(s)" NUMPADMINUS R R]],
+	[["Addon List" K L]],
+	}
+
+	for i,v in pairs(cmds) do
+		SlashCommandMapBind(LeaderKey.GetAccountBindingsTree(), v)
+	end
+	for i,v in pairs(nameCmds) do
+		SlashCommandNameNode(LeaderKey.GetAccountBindingsTree(), v)
+	end
+
+	--[[
+	-- portals (Ideal candidate for helm.)
+	/lkclmap macro "Orgimmar" "/cast Teleport: Orgrimmar" P T O
+	/lkclmap macro "Undercity" "/cast Teleport: Undercity" P T U
+	/lkclmap macro "Thunder Bluff" "/cast Teleport: Thunder Bluff" P T T
+	/lkclmap macro "Silvermoon" "/cast Teleport: Silvermoon" P T S M
+	/lkclmap macro "Stonard" "/cast Teleport: Stonard" P T S T
+	/lkclmap macro "Shattrath" "/cast Teleport: Shattrath" P T S H
+	/lkclmap macro "Dalaran - Northrend" "/cast Teleport: Dalaran - Northrend" P T D N
+	/lkclname "Teleports" P T
+	/lkclmap macro "Orgimmar" "/cast Portal: Orgrimmar" P P O
+	/lkclmap macro "Undercity" "/cast Portal: Undercity" P P U
+	/lkclmap macro "Thunder Bluff" "/cast Portal: Thunder Bluff" P P T
+	/lkclmap macro "Silvermoon" "/cast Portal: Silvermoon" P P S M
+	/lkclmap macro "Stonard" "/cast Portal: Stonard" P P S T
+	/lkclmap macro "Shattrath" "/cast Portal: Shattrath" P P S H
+	/lkclmap macro "Dalaran - Northrend" "/cast Portal: Dalaran - Northrend" P P D N
+	/lkclname "Portals" P P
+
+	-- Pick lock
+	/lkclmap macro "Unlock" "/use Pick Lock" L U (rogue)
+	/lkclmap macro "Detection" "/use Detection" L D (rogue)
+	/lkclunmap L U (rogue)
+	/lkclunmap L D (rogue)
+	/lkclmap macro "Detection" "/use Detection" L D (rogue) -- Shroud.
+	/lkclmap macro "Detection" "/use Detection" L D (rogue) -- Pick Pocket.
+	--]]
+
+end
 
