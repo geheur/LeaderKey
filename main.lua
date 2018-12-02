@@ -12,22 +12,30 @@ local isMenu = Node.isMenu
 
 
 local keySequencePrefix = {b="L","L",a="L"}
+local dynamicMenuPrefix = {"D"}
 
 local ViragCurrentBindingsPointer
 local function CreateRootMenu()
-	local rootmenu = BindingsTree:new()
-	rootmenu.name = "Root"
+	local rootmenu = BindingsTree:cast(Node.CreateSubmenu("Root"))
 	rootmenu:AddBind(Node.CreateSubmenu("Leader Keys"), keySequencePrefix)
+	local dynamicMenuNode = Node.CreateHelmSubmenu("Dynamic Menu")
+	rootmenu:AddBind(dynamicMenuNode, keySequencePrefix)
 	--[[
 	--]]
 
+	LeaderKey.VDT.rootmenu = rootmenu
+
 	return rootmenu
 end
+
+local RootNode = CreateRootMenu()
+
 local CurrentBindings
 local function CreateBindingsTree()
-	CurrentBindings = CreateRootMenu()
+	CurrentBindings = BindingsTree:cast(Node.CreateSubmenu("Leader Key"))
 
 	ViragCurrentBindingsPointer = CurrentBindings
+	RootNode:AddBind(CurrentBindings, keySequencePrefix)
 end
 CreateBindingsTree()
 
@@ -70,6 +78,7 @@ end
 secureTableInsert(AfterLeaderKeyHandlerFrame, "SUBMENU", Node.SUBMENU)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "MACRO", Node.MACRO)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "HELM_SUBMENU", Node.HELM_SUBMENU)
+secureTableInsert(AfterLeaderKeyHandlerFrame, "SOFTLINK", Node.SOFTLINK)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "TYPABLE_CHARS", LeaderKey.private.keyCodeToChar)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "prefix", keySequencePrefix)
 local helmMenuSearchRestrictedSnippet = [[
@@ -140,7 +149,8 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 	MenuItemSelected = [[
 		local node = arg1
 		local button = arg2
-		if node.type == nil then -- root node.
+		--print("MenuItemSelected", node or "nil", button or "nil")
+		if node.type == nil then -- root node. TODO no longer works
 			self:CallMethod("printOptions", "")
 		end
 		if node.type == MACRO then
@@ -194,8 +204,25 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 
 			-- TODO that bug with deleting. this todo should be in a different part of the file, but I'm in a hurry.
 			return
+		elseif node.type == SOFTLINK then
+			self:CallMethod("debugPrint", button, "(softlink)")
+			print("softlink")
+			for i,v in pairs(node.softlink) do
+				print(i,v)
+			end
+			currentSequence = node.softlink
+			arg1 = currentSequence
+			self:Run(GetNode)
+			arg1 = ret1
+			print("name", arg1.name)
+			self:Run(MenuItemSelected)
+			return
 		end
-		self:CallMethod("debugPrint", button, "(node type unknown; this is a bug)")
+		local type
+		if node == nil then str = "[nil node]" else str = (node.type or "nil") end
+		local name
+		if node == nil then name = "[nil node]" else name = (node.name or "nil") end
+		self:CallMethod("debugPrint", button, "(node type " .. str .. " name " .. name .. " unknown; this is a bug)")
 	--]]
 
 	GetNode = [[
@@ -364,12 +391,12 @@ local function UpdateKeybinds()
 	BuildCurrentBindingsTree()
 
 	LeaderKeyOverrideBindOwner:Execute("self:ClearBindings()")
-	local LeaderKeyNode = CurrentBindings:GetNode(keySequencePrefix)
+	local LeaderKeyNode = CurrentBindings
 	for i,v in pairs(LeaderKeyNode.bindings) do
 		SetOverrideBindingClick(LeaderKeyOverrideBindOwner, true, i, AfterLeaderKeyHandlerFrame:GetName(), i)
 	end
 
-	secureTableInsert(AfterLeaderKeyHandlerFrame, "Bindings", CurrentBindings)
+	secureTableInsert(AfterLeaderKeyHandlerFrame, "Bindings", RootNode)
 	AfterLeaderKeyHandlerFrame:Execute("self:Run(ClearSequenceInProgress)")
 end
 
@@ -449,13 +476,17 @@ local function displayNodes(nodeList)
 		for i,v in pairs(node) do -- should only be 1 item in there.
 			nextBind, nextNode = i, v
 		end
+		local iconText = ""
+		if nextNode.icon then
+			iconText = "|T"..nextNode.icon..":0|t"
+		end
 		local text
 		if nextNode.type == Node.MACRO then
-			text = nextBind .. " -> " .. colors.macro .. (nextNode.name or nextNode.macro or "nil") .. "|r"
+			text = nextBind .. " -> " .. iconText .. colors.macro .. (nextNode.name or nextNode.macro or "nil") .. "|r"
 		elseif nextNode.type == Node.HELM_SUBMENU then
-			text = nextBind .. " -> " .. colors.helm_submenu .. (nextNode.name or "[no name]") .. "|r"
+			text = nextBind .. " -> " .. iconText .. colors.helm_submenu .. (nextNode.name or "[no name]") .. "|r"
 		elseif nextNode.type == Node.SUBMENU then
-			text = nextBind .. " -> " .. colors.submenu .. (nextNode.name or "[no name]") .. "|r"
+			text = nextBind .. " -> " .. iconText .. colors.submenu .. (nextNode.name or "[no name]") .. "|r"
 		end
 
 		local actionFrame = listItems[i]
@@ -478,7 +509,7 @@ function AfterLeaderKeyHandlerFrame:printOptions(keySequenceString, helmString)
 
 	clearListItems()
 
-	local node = CurrentBindings:GetNode(keySequence)
+	local node = RootNode:GetNode(keySequence)
 	if not node then Log.warning("Node " .. table.concat(keySequence, " ") .. " does not exist."); return end
 
 	if node.type == Node.SUBMENU then
@@ -521,8 +552,8 @@ local function printBindings(bindingsTree, sequence)
 	end
 end
 
-local printCurrentBindings do
-local function printCurrentBindsHelper(bindingsTree, checkAgainst, sequence)
+do
+	function LeaderKey.printCurrentBindsHelper(bindingsTree, checkAgainst, sequence)
 		sequence = sequence or ""
 		for key,node in pairs(bindingsTree.bindings) do
 			local newSequence = sequence .. key .. " "
@@ -570,10 +601,10 @@ function LeaderKey.UpdateCurrentBindings()
 	UpdateKeybinds()
 end
 
-local function prepend(keySequence)
+local function prepend(prefix, keySequence)
 	local result = {}
-	for i=1,#keySequencePrefix do
-		result[#result + 1] = keySequencePrefix[i]
+	for i=1,#prefix do
+		result[#result + 1] = prefix[i]
 	end
 	for i=1,#keySequence do
 		result[#result + 1] = keySequence[i]
@@ -582,15 +613,15 @@ local function prepend(keySequence)
 end
 
 function LeaderKey.CreateBinding(bindingsTree, node, keySequence)
-	bindingsTree:AddBind(node, prepend(keySequence))
+	bindingsTree:AddBind(node, keySequence)
 end
 
 function LeaderKey.DeleteNode(bindingsTree, keySequence)
-	bindingsTree:DeleteNode(prepend(keySequence))
+	bindingsTree:DeleteNode(keySequence)
 end
 
 function LeaderKey.NameNode(bindingsTree, name, keySequence)
-	return bindingsTree:NameNode(name, prepend(keySequence))
+	return bindingsTree:NameNode(name, keySequence)
 end
 
 function LeaderKey.GetAccountBindingsTree()
@@ -604,7 +635,7 @@ end
 
 local ALL_SPECS = "ALL"
 function LeaderKey.GetSpecBindingsTree(class, spec)
-	LeaderKeyData.classBindings[class] = LeaderKeyData.classBindings[class] or CreateRootMenu()
+	LeaderKeyData.classBindings[class] = LeaderKeyData.classBindings[class] or BindingsTree:new()
 	if LeaderKeyData.classBindings[class][spec] then
 		LeaderKeyData.classBindings[class][spec] = BindingsTree:cast(LeaderKeyData.classBindings[class][spec])
 	else
@@ -635,14 +666,27 @@ end
 creationCallback is a function called whenever a dynamic menu is created. This happens when one is bound, either due to user action or due to the addon loading its binds.
 creationCallback takes 1 argument: a token which represents the menu, used to request LeaderKey to reload the menu.
 --]]
-LeaderKey.DynamicMenuRegistry = {}
-function LeaderKey.RegisterDynamicMenu(name, creationCallback, singleton)
-	if singleton then error("singleton menus not yet supported") end
-	
-	LeaderKey.DynamicMenuRegistry[name] = {creationCallback=creationCallback, singleton=singleton}
+function LeaderKey.GetDynamicMenu(name)
+	local sequence = prepend(dynamicMenuPrefix, {name})
+	return RootNode:GetNode(sequence)
 end
 
+LeaderKey.DynamicMenuRegistry = {}
+function LeaderKey.RegisterDynamicMenu(name, node)
+	local sequence = prepend(dynamicMenuPrefix, {name}) -- name is used as the keybind only because it'll be unique. it's a searchable menu anyways so this won't affect usability.
+	--local node = RootNode:GetNode(sequence)
+	RootNode:AddBind(node, sequence)
+	print("RegisterDynamicMenu", name, node)
+	LeaderKey.DynamicMenuRegistry[name] = node
+end
+
+local mydynamicmenu = Node.CreateSubmenu("test dynamic menu")
+mydynamicmenu.bindings.A = Node.CreateMacroNode("A", "/script print('a')")
+mydynamicmenu.bindings.B = Node.CreateMacroNode("B", "/script print('b')")
+LeaderKey.RegisterDynamicMenu("testdynamic", mydynamicmenu)
+
 function LeaderKey.UpdateDynamicMenu(token)
+	print("NYI - UpdateDynamicMenu")
 end
 
 -- NYI
@@ -667,7 +711,7 @@ end
 
 local events = {}
 function events:PLAYER_ENTERING_WORLD(...)
-	local debug = true
+	local debug = false
 	if ViragDevTool_AddData and debug then
 		ViragDevTool_AddData(ViragCurrentBindingsPointer.bindings, "LKMAP")
 		ViragDevTool_AddData(LeaderKeyData.accountBindings, "LKMAP_ACCOUNT")
@@ -682,13 +726,13 @@ do
 	function events:ADDON_LOADED(...)
 		if addonIsLoaded then return end
 
-		local debugWipe = false
+		local debugWipe = true
 		if debugWipe then
 			LeaderKeyData = nil
 		end
 
-		LeaderKeyData = LeaderKeyData or CreateRootMenu()
-		LeaderKeyData.classBindings = LeaderKeyData.classBindings or CreateRootMenu()
+		LeaderKeyData = LeaderKeyData or {}
+		LeaderKeyData.classBindings = LeaderKeyData.classBindings or BindingsTree:new()
 		LeaderKey.UpdateCurrentBindings()
 
 		setupFrames()

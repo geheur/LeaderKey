@@ -61,12 +61,10 @@ local function parseArgs(txt)
 		start = nil
 	end
 
-	--[[
 	Log.debug("args:")
 	for i,v in pairs(args) do
 		Log.debug(i,v)
 	end
-	--]]
 
 	return args
 end
@@ -81,8 +79,8 @@ end
 local macrotype = "macro"
 local spelltype = "spell"
 local helmtype = "helm"
-local function SlashCommandMapBind(bindingsTree, txt)
-	print("raw slash command argument:", txt)
+local function SlashCommandMapBind(bindingsTree, txt, silent)
+	Log.debug("raw slash command argument:", txt)
 	local args = parseArgs(txt)
 	if not args or not args[4] then Log.error("invalid arguments"); return end
 
@@ -98,21 +96,30 @@ local function SlashCommandMapBind(bindingsTree, txt)
 	elseif type == spelltype then
 		local spellName, rank, icon, castTime, minRange, maxRange, spellId = GetSpellInfo(contents)
 		if not spellName then
-			Log.error("|cFFFFA500Could not find spell " .. spellName .. ".|r")
+			Log.error("|cFFFFA500Could not find spell " .. contents .. ".|r")
 			return
 		end
 		node = Node.CreateSpellNode(name, spellName)
-		ViragDevTool_AddData(node, "bla")
+		--ViragDevTool_AddData(node, "bla")
 	elseif type == helmtype then
 		node = Node.CreateHelmSubmenu(name)
 	else
-		Log.error("Unknown type \"" .. type .. "\"")
-		return
+		for i,v in pairs(LeaderKey.DynamicMenuRegistry) do
+			Log.debug("dynamic menu registry:", i, v)
+			if type == i then
+				node = Node.CreateSoftLink(name, {"D", name})
+			end
+		end
+
+		if node == nil then
+			Log.error("Unknown type \"" .. type .. "\"")
+			return
+		end
 	end
 
 	LeaderKey.CreateBinding(bindingsTree, node, keySequence)
 	LeaderKey.UpdateCurrentBindings()
-	Log.info("Created bind " .. table.concat(keySequence, " ") .. " to " .. name)
+	if not silent then Log.info("Created bind " .. table.concat(keySequence, " ") .. " to " .. name) end
 end
 
 local function SlashCommandMapUnbind(bindingsTree, txt)
@@ -125,7 +132,7 @@ local function SlashCommandMapUnbind(bindingsTree, txt)
 	Log.info("Deleted node " .. table.concat(keySequence, " ") .. " (or, it didn't exist in the first place)")
 end
 
-local function SlashCommandNameNode(bindingsTree, txt)
+local function SlashCommandNameNode(bindingsTree, txt, silent)
 	local args = parseArgs(txt)
 	if not args or not args[1] then Log.error("invalid arguments"); return end
 	local name = args[1] or "nil"
@@ -133,7 +140,7 @@ local function SlashCommandNameNode(bindingsTree, txt)
 
 	local successful = LeaderKey.NameNode(bindingsTree, name, keySequence)
 	LeaderKey.UpdateCurrentBindings()
-	if successful then
+	if successful and not silent then
 		Log.info("Named node " .. table.concat(keySequence, " ") .. " to " .. name)
 	end
 end
@@ -194,7 +201,7 @@ registerSlashCommand("LEADERKEY_UNMAP", {"/lkunmap"},
 --]]
 registerSlashCommand("LEADERKEY_PRINT_CURRENT", {"/lkpc"},
                      function(txt, editbox)
-								printCurrentBindings(LeaderKey.GetCurrentBindingsTree())
+								LeaderKey.printCurrentBindings(LeaderKey.GetCurrentBindingsTree())
                      end
 )
 
@@ -209,21 +216,22 @@ function LeaderKey.loadstuff()
 
 	-- Mounts
 	[[helm "Mounts" _ K M]],
-	[[macro "Astral Cloud Serpent" "/cast Astral Cloud Serpent" K M 1]],
-	[[macro "Mimiron's Head" "/cast Mimiron's Head" K M 2]],
-	[[macro "Fire Dog" "/cast Antoran Charhound" K M 3]],
-	[[macro "Shadow Dog" "/cast Antoran Gloomhound" K M 4]],
-	[[macro "Kite" "/castrandom Pandaren Kite, Jade Pandaren Kite" K M 5]],
-	[[macro "Firehawk" "/cast Pureblood Fire Hawk" K M 6]],
-	[[macro "Shadowhawk" "/cast Corrupted Fire Hawk" K M 7]],
-	[[macro "Headless Horseman's Mount" "/cast Headless Horseman's Mount" K M 8]],
-	[[macro "Anzu" "/cast Raven Lord" K M 9]],
-	[[macro "Cloud" "/cast Red Flying Cloud" K M 10]],
-	[[macro "Pink bird" "/cast Swift Lovebird" K M 11]],
-	[[macro "Dreamrunner" "/cast Wild Dreamrunner" K M 12]],
-
-	-- Pets
-	[[macro "Tuskarr Kite" "/summonpet Tuskarr Kite" P T]],
+	[[helm "Pets" _ K P]],
+	--[=[
+	[[spell "Astral Cloud Serpent" "Astral Cloud Serpent" K M 1]],
+	[[spell "Mimiron's Head" "Mimiron's Head" K M 2]],
+	[[spell "Fire Dog" "Antoran Charhound" K M 3]],
+	[[spell "Shadow Dog" "Antoran Gloomhound" K M 4]],
+	[[spell "Kite" "Pandaren Kite" K M 5]],
+	[[spell "Kite (Jade)" "Jade Pandaren Kite" K M 13]],
+	[[spell "Firehawk" "Pureblood Fire Hawk" K M 6]],
+	[[spell "Shadowhawk" "Corrupted Fire Hawk" K M 7]],
+	[[spell "Headless Horseman's Mount" "Headless Horseman's Mount" K M 8]],
+	[[spell "Anzu" "Raven Lord" K M 9]],
+	[[spell "Cloud" "Red Flying Cloud" K M 10]],
+	[[spell "Pink bird" "Swift Lovebird" K M 11]],
+	[[spell "Dreamrunner" "Wild Dreamrunner" K M 12]],
+	--]=]
 
 	[[macro "Naked Set" "/equipset Naked" K E]],
 
@@ -252,13 +260,12 @@ function LeaderKey.loadstuff()
 	[[macro "Communities" "/script ToggleGuildFrame()" K O]],
 	[[macro "Guild" "/guildroster" K G]],
 	[[macro "Achievements" "/script ToggleAchievementFrame()" K A]],
-	[[macro "Spellbook" "/script ToggleSpellBook(BOOKTYPE_SPELL)" K P]],
 	[[macro "Talents" "/script ToggleTalentFrame(2)" K N]],
 	[[macro "Close Windows" "/script CloseAllWindows()" K E]],
 
 	[[macro "Katy (Mailbox 10 mins)" "/use Katy's Stampwhistle" K T K]],
 
-	[[macro "Hearthstone" "/use The Innkeeper's Daughter" K T H]],
+	[[macro "Hearthstone" "/use Headless Horseman's Hearthstone" K T H]],
 	[[macro "Garrison Hearthstone" "/use Garrison Hearthstone" K T G]],
 	[[macro "Dalaran Hearthstone" "/use Dalaran Hearthstone" K T D]],
 	[[macro "Whistle" "/use Flight Master's Whistle" K T W]],
@@ -269,6 +276,7 @@ function LeaderKey.loadstuff()
 	[[macro "/vuhdo opt" "/vuhdo opt" K D V]],
 	[[macro "Table Attributes" "/fstack\n/fstack\n/script MyTad()" K D T]],
 	[[macro "Table Attributes" "/fstack\n/fstack\n/script local f = TableAttributeDisplay f.LinesScrollFrame:SetSize(935, 400); f:SetSize(1000, 500); f.HighlightButton:SetChecked(true) f:InspectTable(PlayerTalentFrameTalents); f:Show()" K D T]],
+	[[macro /test1 /test1 K D S]],
 
 	[[macro Star "/script local n = 1 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R S]],
 	[[macro Circle "/script local n = 2 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R C]],
@@ -276,30 +284,46 @@ function LeaderKey.loadstuff()
 	[[macro Triangle "/script local n = 4 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R T]],
 	[[macro Moon "/script local n = 5 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R A]],
 	[[macro Square "/script local n = 6 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R Q]],
-	[[macro Cross "/script local n = 7 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R X]],
-	[[macro Skull "/script local n = 8 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R W]],
+	[[macro Cross "/script local n = 7 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R G]],
+	[[macro Skull "/script local n = 8 local t='target' if n~=GetRaidTargetIndex(t) then SetRaidTarget(t, n) end" NUMPADMINUS R F]],
 	[[macro Clear "/script local t='target' local n = GetRaidTargetIndex(t) if n~=nil then SetRaidTarget(t, n) end" NUMPADMINUS R E]],
-	[[macro Star "/wm 1" NUMPADMINUS R SHIFT-S]],
-	[[macro Circle "/wm 2" NUMPADMINUS R SHIFT-C]],
+	[[macro Star "/wm 5" NUMPADMINUS R SHIFT-S]],
+	[[macro Circle "/wm 6" NUMPADMINUS R SHIFT-C]],
 	[[macro Diamond "/wm 3" NUMPADMINUS R SHIFT-D]],
-	[[macro Triangle "/wm 4" NUMPADMINUS R SHIFT-T]],
-	[[macro Moon "/wm 5" NUMPADMINUS R SHIFT-A]],
-	[[macro Square "/wm 6" NUMPADMINUS R SHIFT-Q]],
-	[[macro Cross "/wm 7" NUMPADMINUS R SHIFT-X]],
-	[[macro Skull "/wm 8" NUMPADMINUS R SHIFT-W]],
+	[[macro Triangle "/wm 2" NUMPADMINUS R SHIFT-T]],
+	[[macro Moon "/wm 7" NUMPADMINUS R SHIFT-A]],
+	[[macro Square "/wm 1" NUMPADMINUS R SHIFT-Q]],
+	[[macro Cross "/wm 4" NUMPADMINUS R SHIFT-G]],
+	[[macro Skull "/wm 8" NUMPADMINUS R SHIFT-F]],
 
-	[[macro Star "/cwm 1" NUMPADMINUS R R S]],
-	[[macro Circle "/cwm 2" NUMPADMINUS R R C]],
+	[[macro Star "/cwm 5" NUMPADMINUS R R S]],
+	[[macro Circle "/cwm 6" NUMPADMINUS R R C]],
 	[[macro Diamond "/cwm 3" NUMPADMINUS R R D]],
-	[[macro Triangle "/cwm 4" NUMPADMINUS R R T]],
-	[[macro Moon "/cwm 5" NUMPADMINUS R R A]],
-	[[macro Square "/cwm 6" NUMPADMINUS R R Q]],
-	[[macro Cross "/cwm 7" NUMPADMINUS R R X]],
-	[[macro Skull "/cwm 8" NUMPADMINUS R R W]],
-	[[macro Skull "/cwm all" NUMPADMINUS R R E]],
+	[[macro Triangle "/cwm 2" NUMPADMINUS R R T]],
+	[[macro Moon "/cwm 7" NUMPADMINUS R R A]],
+	[[macro Square "/cwm 1" NUMPADMINUS R R Q]],
+	[[macro Cross "/cwm 4" NUMPADMINUS R R G]],
+	[[macro Skull "/cwm 8" NUMPADMINUS R R F]],
+	[[macro "Clear All" "/cwm all" NUMPADMINUS R R E]],
 
 	[[macro "Addon List" "/script ShowUIPanel(AddonList)" K L A]],
 	}
+	for i=0,C_MountJournal.GetNumMounts() do
+		local name, spellID,_,_,usable,_,_,_,_, hidden, collected,_ = C_MountJournal.GetMountInfoByID(i)
+		if collected and usable and not hidden then
+			cmds[#cmds+1] = [[spell "]]..name..[[" "]]..name..[[" K M ]]..i
+		end
+	end
+	local petIDs = {}
+	for i=0,select(2, C_PetJournal.GetNumPets()) do
+		local petID,_,_,_,_,_,_,speciesName, icon,_,_, tooltip, description,_,_,_,_,_ = C_PetJournal.GetPetInfoByIndex(i)
+		if not petID then break end
+		if owned and not hidden and not petIDs[petID] then
+			petIDs[petID] = true
+			print("adding", [[spell "]]..speciesName..[[" "]]..speciesName..[[" K P ]]..i)
+			cmds[#cmds+1] = [[spell "]]..speciesName..[[" "]]..speciesName..[[" K P ]]..i
+		end
+	end
 
 	local nameCmds = {
 	[["Raid Markers" NUMPADMINUS R]],
@@ -309,17 +333,19 @@ function LeaderKey.loadstuff()
 	[[Dungeon K J D]],
 	[[Raid K J R]],
 	[["Dungeon Journal" K J]],
-	[["Pets" P]],
+	[["Pets" K P]],
 	[[Collections K C]],
 	[["Clear Marker(s)" NUMPADMINUS R R]],
 	[["Addon List" K L]],
 	}
 
+	if true then
 	for i,v in pairs(cmds) do
-		SlashCommandMapBind(LeaderKey.GetAccountBindingsTree(), v)
+		SlashCommandMapBind(LeaderKey.GetAccountBindingsTree(), v, true)
 	end
 	for i,v in pairs(nameCmds) do
-		SlashCommandNameNode(LeaderKey.GetAccountBindingsTree(), v)
+		SlashCommandNameNode(LeaderKey.GetAccountBindingsTree(), v, true)
+	end
 	end
 
 	--[[

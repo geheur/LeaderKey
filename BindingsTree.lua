@@ -14,9 +14,17 @@ local Log = LeaderKey.private.Log
 local SUBMENU = "submenu"
 local HELM_SUBMENU = "helm-submenu"
 local MACRO = "macro"
+local SOFTLINK = "softlink"
+local SPELL = "spell"
+local PET = "spell"
+--local MOUNT = SPELL
 Node.SUBMENU = SUBMENU
 Node.HELM_SUBMENU = HELM_SUBMENU
 Node.MACRO = MACRO
+Node.SOFTLINK = SOFTLINK
+Node.SPELL = SPELL
+Node.PET = PET
+--Node.MOUNT = MOUNT
 
 function Node.CreateNode(name, type)
 	return {name = name, type = type}
@@ -30,7 +38,9 @@ function Node.CreateMacroNode(name, macro)
 end
 
 function Node.CreateSpellNode(name, spellName)
-	return CreateMacroNode(name, '/use ' .. spellName)
+	local node = Node.CreateMacroNode(name, '/use ' .. spellName)
+	node.icon = select(3, GetSpellInfo(spellName))
+	return node
 end
 
 function Node.CreateSubmenu(name)
@@ -43,6 +53,16 @@ function Node.CreateHelmSubmenu(name)
 	local helmMenu = Node.CreateNode(name, HELM_SUBMENU)
 	helmMenu.bindings = {}
 	return helmMenu
+end
+
+function Node.CreateSoftLink(name, keySequence)
+	local node = Node.CreateNode(name, SOFTLINK)
+	local keySequenceCopy = {}
+	for i,v in pairs(keySequence) do
+		keySequenceCopy[#keySequenceCopy + 1] = v
+	end
+	node.softlink = keySequenceCopy
+	return node
 end
 
 function Node.isMenu(node)
