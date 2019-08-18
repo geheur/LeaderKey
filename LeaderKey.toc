@@ -12,6 +12,12 @@ frames.xml
 LeaderKey.lua
 utils.lua
 BindingsTree.lua
+SecureKeySequenceProcessing.lua
 main.lua
+PopupMenu.lua
 SlashCommands.lua
+
 test.lua
+
+dev/loadstuff.lua
+dev/anymodifier.lua

@@ -1,30 +1,18 @@
-LeaderKey.BindingsTree = {}
-LeaderKey.BindingsTree.Node = {}
-
 local BindingsTree = LeaderKey.BindingsTree
 local Node = BindingsTree.Node
 
 local slice = LeaderKey.private.slice
-local debugPrint = LeaderKey.private.debugPrint
 local tableSize = LeaderKey.private.tableSize
 local Log = LeaderKey.private.Log
 
 -- ### Node constructors.
 
-local SUBMENU = "submenu"
-local HELM_SUBMENU = "helm-submenu"
-local MACRO = "macro"
-local SOFTLINK = "softlink"
-local SPELL = "spell"
-local PET = "spell"
---local MOUNT = SPELL
-Node.SUBMENU = SUBMENU
-Node.HELM_SUBMENU = HELM_SUBMENU
-Node.MACRO = MACRO
-Node.SOFTLINK = SOFTLINK
-Node.SPELL = SPELL
-Node.PET = PET
---Node.MOUNT = MOUNT
+local SUBMENU = Node.submenu
+local HELM_SUBMENU = Node.helmSubmenu
+local MACRO = Node.macro
+local SOFTLINK = Node.softlink
+local SPELL = Node.spell
+-- local PET = Node.spell
 
 function Node.CreateNode(name, type)
 	return {name = name, type = type}
@@ -55,7 +43,7 @@ function Node.CreateHelmSubmenu(name)
 	return helmMenu
 end
 
-function Node.CreateSoftLink(name, keySequence)
+function Node.CreateSoftlink(name, keySequence)
 	local node = Node.CreateNode(name, SOFTLINK)
 	local keySequenceCopy = {}
 	for i,v in pairs(keySequence) do
@@ -70,6 +58,19 @@ function Node.isMenu(node)
 end
 
 -- ### BindingsTree class.
+--[[
+{
+	type="SUBMENU",
+	bindings={
+		"KEYBIND_NAME"={
+			type="?",
+			bindings={...}
+			-- other properties.
+		}
+	}
+}
+--]]
+
 
 BindingsTree.type = SUBMENU
 BindingsTree.__index = BindingsTree
@@ -85,19 +86,15 @@ function BindingsTree:cast(toCast)
 end
 
 function BindingsTree:GetParentNode(keySequence)
-	--print("bla", table.concat(keySequence, ","))
 	keySequence = slice(keySequence, 1, #keySequence - 1)
 	i = 1
 	local value = keySequence[i]
 	local node = self
 
 	while value do
-		--print("value", value)
-		--print("value", node.bindings[value])
 		if not node.bindings[value] or not Node.isMenu(node.bindings[value]) then
 			return nil
 		end
-		--print("value2", node.bindings[value].type)
 		node = node.bindings[value]
 		i = i + 1
 		value = keySequence[i]
@@ -108,24 +105,9 @@ end
 function BindingsTree:GetNode(keySequence)
 	if #keySequence == 0 then return self end
 	local parent = self:GetParentNode(keySequence)
-	--print("parent", parent, bind)
-	--if parent ~= nil then print("parentname", parent.name, bind) end
-	if not parent then return nil end
+	if not parent or not Node.isMenu(parent) then return nil end
 	local bind = keySequence[#keySequence]
-	--if parent ~= nil then print("parentname2", parent.name, bind) end
-	if not parent or not Node.isMenu(parent) or not parent.bindings[bind] then
-		return nil
-	else 
-		if parent.type == SUBMENU then
-			return parent.bindings[bind]
-		elseif parent.type == HELM_SUBMENU then
-			for binding,node in pairs(parent.bindings) do
-				if node.name == bind then
-					return node
-				end
-			end
-		end
-	end
+	return parent.bindings[bind] -- may be nil if bind doesn't exist.
 end
 
 function BindingsTree:PrepareSubmenus(keySequence)
@@ -158,6 +140,7 @@ function BindingsTree:AddBind(node, keySequence)
 end
 
 -- Also deletes any childless parent submenus.
+-- TODO figure out what the return value is and document it
 function BindingsTree:DeleteNode(keySequence)
 	local bind = keySequence[#keySequence]
 	keySequence = slice(keySequence, 1, #keySequence - 1)
@@ -212,9 +195,40 @@ function BindingsTree:DeleteNode(keySequence)
 	end
 end
 
+local function CopyInBindingsTree(currentBindingsTree, bindingsTree)
+	for key,node in pairs(bindingsTree.bindings) do
+		Log.debug("key,node", key, node)
+		local currentNode = currentBindingsTree.bindings[key]
+		if node.type == Node.SUBMENU then
+			if currentNode ~= nil and currentNode.type ~= Node.SUBMENU then
+				-- TODO why is this stuff commented out?
+				Log.warn("(Not sure what this message is) |cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
+			end
+			if currentNode == nil or currentNode.type ~= Node.SUBMENU then
+				currentBindingsTree.bindings[key] = Node.CreateSubmenu(node.name) -- TODO copy function?
+			end
+			CopyInBindingsTree(currentBindingsTree.bindings[key], node)
+			-- TODO helm submenus.
+		else
+			if currentNode ~= nil then
+				-- TODO why is this stuff commented out?
+				Log.warn("check BindingsTree.xml.") -- TODO.
+				--print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
+			end
+			Log.debug("binding", currentBindingsTree.name or "", key, "to", node.name)
+			currentBindingsTree.bindings[key] = node -- TODO make sure no one changes this node...
+		end
+	end
+end
+
+-- will replace parts of the current tree with otherTree when there are conflicts.
+function BindingsTree:mergeInTree(otherTree)
+	CopyInBindingsTree(self, otherTree)
+end
+
 function BindingsTree:NameNode(name, keySequence)
 	local node = self:GetNode(keySequence)
-	if not node then Log.warning("Node " .. table.concat(keySequence, " ") .. " does not exist."); return false end
+	if not node then Log.warn("Node " .. table.concat(keySequence, " ") .. " does not exist."); return false end
 	node.name = name
 	return true
 end

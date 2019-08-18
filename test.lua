@@ -127,7 +127,7 @@ if LeaderKey.private.runTests then
 	assert(not GetNode('A B'))
 	-- Tests deletion of original bind.
 	Bindings = BindingsTree:new()
-	LeaderKey.VDT.Bindings = Bindings
+	LeaderKey.VDT.TestBindings = Bindings
 	AddBind('A B C')
 	Log.debug("bla")
 	DeleteNode('A B C')
