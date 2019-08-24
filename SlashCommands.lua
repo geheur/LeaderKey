@@ -111,7 +111,7 @@ local function doBind(keySequence, nodeToAdd)
 	)
 	Log.info("Created bind" .. s .. " for " .. LeaderKey.nodeForPrint(nodeToAdd))
 
-	LeaderKey.UpdateCurrentBindings()
+	LeaderKey.UpdateKeybinds()
 end
 
 LeaderKey.dobind = doBind
@@ -130,7 +130,7 @@ local function doUnbind(keySequence)
 		Log.info("Deleted bind" .. s)
 	end
 
-	LeaderKey.UpdateCurrentBindings()
+	LeaderKey.UpdateKeybinds()
 end
 
 local function doRebind(keySequence) -- TODO implement correctly.
@@ -149,7 +149,7 @@ local function doRebind(keySequence) -- TODO implement correctly.
 		Log.info("Rebound " .. s)
 	end
 
-	LeaderKey.UpdateCurrentBindings()
+	LeaderKey.UpdateKeybinds()
 end
 
 local keybindingFrame = CreateFrame("FRAME")
@@ -172,10 +172,29 @@ end
 desired: /lk(re)bind TYPE SUBJECT NAME
 --]]
 
-local macrotype = "macro"
-local spelltype = "spell"
-local helmtype = "helm"
-local softlinktype = "softlink"
+local lkbindTypes = {
+	macro = function(type, name, content)
+		return Node.CreateMacroNode(name, contents:gsub("\\n","\n"))
+	end,
+	spell = function(type, name, content)
+		local spellName, rank, icon, castTime, minRange, maxRange, spellId = GetSpellInfo(contents)
+		if not spellName then
+			Log.error("|cFFFFA500Could not find spell " .. contents .. ".|r")
+			return
+		end
+		node = Node.CreateSpellNode(name, spellName)
+	end,
+	item = function(type, name, content)
+		node = Node.CreateItemNode(name, content)
+	end,
+	searchable = function(type, name, content)
+		print("nyi")
+	end,
+	softlink = function(type, name, content)
+		print("nyi")
+	end,
+}
+
 local function handleSlashCommand(command, txt)
 	Log.debug("raw slash command argument: /"..command, txt)
 	local args = parseArgs(txt)
@@ -184,38 +203,36 @@ local function handleSlashCommand(command, txt)
 	if command == "bind" then
 		-- local type = strlower(args[1])
 		local type = args[1]
-		local contents = args[2]
-		local name = args[3]
+		local name = args[2]
+		local content = args[3]
+		if not content then content = name end
 
-
-		-- if name == "_" then name = nil end
+		if not type then
+			print("TODO implement help.")
+			return
+		end
 
 		local node
-		if type == macrotype then
-			node = Node.CreateMacroNode(name, contents:gsub("\\n","\n"))
-		elseif type == spelltype then
-			local spellName, rank, icon, castTime, minRange, maxRange, spellId = GetSpellInfo(contents)
-			if not spellName then
-				Log.error("|cFFFFA500Could not find spell " .. contents .. ".|r")
-				return
-			end
-			node = Node.CreateSpellNode(name, spellName)
-			--ViragDevTool_AddData(node, "bla")
-		elseif type == helmtype then
-			node = Node.CreateHelmSubmenu(name)
-		else
-			-- for i,v in pairs(LeaderKey.DynamicMenuRegistry) do -- TODO fix.
-			for i,v in pairs({testsoftlink="testsoftlink"}) do
-				Log.debug("dynamic menu registry:", i, v)
-				if type == i then
-					node = Node.CreateSoftlink(name, {"D", contents}) -- TODO this needs to look up the bind, not use "contents" directly.
+		local f = lkbindTypes[type]
+		if not f then
+			for pluginName,plugin in pairs(LeaderKey.DynamicMenuRegistry) do
+				if type == pluginName then
+					node = Node.CreateSoftlink(pluginName, {"D", type})
 				end
 			end
 
-			if node == nil then
-				Log.error("Unknown type \"" .. type .. "\"")
+			if not node then
+				print("type "..type.." does not exist")
+				-- TODO include help.
 				return
 			end
+		end
+
+		if not node then node = f(type, name, content) end
+
+		if node == nil then
+			Log.error("Unknown type \"" .. type .. "\"")
+			return
 		end
 
 		getKeySequenceFromUserAndThen(function(keySequence) doBind(keySequence, node) end)
@@ -227,6 +244,66 @@ local function handleSlashCommand(command, txt)
 		Log.error("this shouldn't happen")
 	end
 end
+
+local function InteractiveAddNode(currentSequence)
+	-- TODO coroutines are not needed here.
+	coroutine.create(function() -- establish variable. "local co =" wouldn't work because the rvalue is evaluated before the local variable is created.
+														    -- Ex: /script local p = function() print("p:", p) end p() -- prints nil
+		if InCombatLockdown() then
+			print("Cannot change binds in combat, try again later!")
+			return
+		end
+		OpenEditMenu(currentSequence, co)
+
+		local node, sequence = yield()
+
+		-- Add node.
+		if not node then return end
+		if InCombatLockdown() then
+			print("Cannot change binds in combat, try again later!")
+			return
+		end
+		LeaderKey.GetAccountBindingsTree():AddNode(node, sequence)
+		LeaderKey.SelectSequence(currentSequence)
+	end)
+	coroutine.resume(co)
+end
+
+local deleteMode = false
+local function InteractiveRmNode()
+	if InCombatLockdown() then
+		print("Cannot change binds in combat, try again later!")
+		return
+	end
+
+	LeaderKey.DisableNodeActions()
+	-- Popup menu indicator of delete mode.
+end
+LeaderKey.registerForKeySequenceStateUpdate(function()
+	-- If deleteMode is true:
+	-- Delete node.
+	-- Reset to deleted node's parent.
+	-- Possibly disable deleteMode.
+	-- un-disable menu if appropriate.
+end)
+
+local function InteractiveEditNode()
+	if InCombatLockdown() then
+		print("Cannot change binds in combat, try again later!")
+		return
+	end
+end
+
+--[[
+m-a - add node. Open interface to create node.
+
+m-e - enter key for node. Open interface to create node.
+	You'll have to block non-menu node (e.g. macro node) execution in the secure frame - as well as any other actions (if you add action submenus).
+
+m-d - enter key for node.
+
+	Copying nodes.
+--]]
 
 --[[
 /lkl[ist]

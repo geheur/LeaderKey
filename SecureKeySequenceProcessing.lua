@@ -4,9 +4,62 @@ local secureTableInsert = LeaderKey.private.secureTableInsert
 
 -- ### Core keybind setup code.
 local AfterLeaderKeyHandlerFrame = CreateFrame("BUTTON", "After Leader Key Handler Frame", nil, "SecureHandlerClickTemplate,SecureActionButtonTemplate")
+--[[
+/dump LeaderKey.private.AfterLeaderKeyHandlerFrame:GetAttribute("type")
+/dump LeaderKey.private.AfterLeaderKeyHandlerFrame:GetAttribute("clickbutton")
+LeaderKey.private.AfterLeaderKeyHandlerFrame:SetAttribute("clickbutton", SpellbookMicroButton) -- This isn't really a good way to do it because it has to happen out of combat.
+LeaderKey.private.AfterLeaderKeyHandlerFrame:SetAttribute("clickbutton", SpellbookMicroButton)
+/script LeaderKey.private.AfterLeaderKeyHandlerFrame:SetAttribute("_onupdate", "print('bla')")
+print(LeaderKey.private.AfterLeaderKeyHandlerFrame:GetAttribute("clickbutton"))
+
+/dump NamePlate1UnitFrame.GetAttribute
+/script NamePlate1UnitFrame:SetAttribute("type", "togglemenu")
+/script NamePlate1UnitFrame:SetAttribute("unit", "nameplate1")
+--]]
 LeaderKey.private.AfterLeaderKeyHandlerFrame = AfterLeaderKeyHandlerFrame
 
+-- startattack = CreateFrame("BUTTON", "startattack", nil, "SecureHandlerClickTemplate,SecureActionButtonTemplate,SecureHandlerAttributeTemplate,SecureHandlerShowHideTemplate")
+-- startattack:SetAttribute("type", "macro")
+-- startattack:SetAttribute("macrotext", "macro")
+-- startattack:WrapScript(startattack, "OnShow", "self:Click")
+
+-- startattack2 = CreateFrame("BUTTON", "startattack2")
+-- startattack2:HookScript("OnClick", function() print("bla") end)
+
+-- testframe = CreateFrame("BUTTON", "testframe", nil, "SecureHandlerClickTemplate,SecureActionButtonTemplate,SecureHandlerAttributeTemplate")
+
+-- why the fuck won't this work.
+-- print("_onclick", testframe:GetAttribute("_onclick"))
+-- testframe:SetAttribute("_onclick", [[print("bla_onclick")]])
+-- print("_onclick", testframe:GetAttribute("_onclick"))
+
+-- /dump testframe:GetAttribute("_onclick", "print('bla_onclick')")
+-- testframe:SetFrameRef("ref", startattack)
+-- testframe:WrapScript(testframe, "OnClick", "print(self:GetFrameRef('ref'):GetName()) self:GetFrameRef('ref'):Show() print('bla')")
+-- testframe:SetParent(UIParent)
+-- testframe:SetSize(500,500)
+-- testframe:SetPoint("TOPLEFT")
+-- hooksecurefunc("SecureHandler_OnClick", function() print("bla_hook") end)
+-- SetOverrideBindingClick(testframe, true, "I", "testframe")
+--[[
+/dump MovePadJump:IsProtected()
+/dump SpellBookFrame:IsProtected()
+/dump MovePadJump:IsForbidden()
+/dump SpellBookFrame:IsForbidden()
+/dump MovePadJump:GetScript("OnMouseDown")()
+/script MovePadJump:GetScript("OnMouseDown")(MovePadJump)
+/script MovePadJump:HookScript("OnMouseDown", function() print("bla") end)
+/script MovePadJump:Click()
+--]]
+-- print("MovePadJump", MovePadJump)
+-- LeaderKey.private.AfterLeaderKeyHandlerFrame:SetFrameRef("ref", SpellbookMicroButton) -- This isn't really a good way to do it because it has to happen out of combat.
+-- /script SpellbookMicroButton:Hide()
+-- LeaderKey.private.AfterLeaderKeyHandlerFrame:SetAttribute("unit", "target")
+-- LeaderKey.private.AfterLeaderKeyHandlerFrame:SetAttribute("togglemenu", true)
+
 AfterLeaderKeyHandlerFrame:RegisterForClicks(--[["AnyUp", ]]"AnyDown")
+
+-- TODO currently your results are like cd -P, which imo is not good (at least not as the default).
 
 local helmMenuSearchSnippet = [[
 
@@ -42,6 +95,7 @@ do
 	if err then error(err) else LeaderKey.private.helmMenuSearch = func() end
 end
 
+-- TODO some of these are like 1k characters in order to insert like 15 characters of payload. Can this be improved?
 secureTableInsert(AfterLeaderKeyHandlerFrame, "SUBMENU", Node.SUBMENU)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "MACRO", Node.MACRO)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "HELM_SUBMENU", Node.HELM_SUBMENU)
@@ -58,17 +112,12 @@ local helmMenuSearchRestrictedSnippet = [[
 secureTableInsert(AfterLeaderKeyHandlerFrame, "helmMenuSearch", helmMenuSearchRestrictedSnippet)
 
 
--- TODO fix
-function AfterLeaderKeyHandlerFrame:cancelSequence()
-end
-
 local keySequenceStateUpdateListeners = {}
 -- TODO documentation.
 function LeaderKey.registerForKeySequenceStateUpdate(listener)
 	tinsert(keySequenceStateUpdateListeners, listener)
 end
 
--- TODO implement as a listener.
 function AfterLeaderKeyHandlerFrame:printOptions(keySequenceString, helmString)
 	for _,listener in ipairs(keySequenceStateUpdateListeners) do
 		listener(keySequenceString, helmString)
@@ -135,7 +184,6 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 			-- self:CallMethod("printOptions", "")
 		-- end
 		if node.type == MACRO then
-			self:CallMethod("debugPrint", button, "(macro)")
 			self:SetAttribute("type", "macro")
 			self:SetAttribute("macrotext", node.macro)
 
@@ -143,8 +191,6 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 			self:Run(ClearSequenceInProgress)
 			return
 		elseif node.type == SUBMENU then
-			self:CallMethod("debugPrint", node.name, "(submenu)")
-
 			self:ClearBindings()
 			for _,bind in pairs(AlwaysBind) do
 				self:SetBindingClick(true, bind, self:GetName(), bind)
@@ -158,9 +204,6 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 			self:CallMethod("printOptions", self:Run(NonBuggedConcat, " ", unpack(currentSequence)))
 			return
 		elseif node.type == HELM_SUBMENU then
-			self:CallMethod("debugPrint", button, "(helm menu)")
-			self:CallMethod("debugPrint", "button for helm menu pressed")
-
 			currentHelmString = ""
 			currentHelmPosition = 1
 
@@ -182,7 +225,6 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 			-- TODO that bug with deleting. this todo should be in a different part of the file, but I'm in a hurry.
 			return
 		elseif node.type == SOFTLINK then
-			self:CallMethod("debugPrint", button, "(softlink)")
 			currentSequence = node.softlink
 
 			local seq = newtable()
@@ -194,7 +236,6 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 			arg1 = currentSequence
 			self:Run(GetNode)
 			arg1 = ret1
-			print("name", arg1.name)
 			self:Run(MenuItemSelected)
 			return
 		end
@@ -245,16 +286,17 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 
 		-- main chunk of code.
 		if currentNode.type == HELM_SUBMENU then
-			self:CallMethod("debugPrint", "Helm submenu.")
 			if button == BACKSPACE and currentHelmString:len() > 0 then
 				currentHelmString = currentHelmString:sub(0, currentHelmString:len() - 1)
 				self:CallMethod("printOptions", self:Run(NonBuggedConcat, " ", unpack(currentSequence)), currentHelmString)
 				return
-			elseif button == ESCAPE or (button == BACKSPACE and currentHelmString:len() == 0) then
+			elseif button == ESCAPE then
+				-- use default behavior
+			elseif button == BACKSPACE and currentHelmString:len() == 0 then
+			-- elseif button == ESCAPE or (button == BACKSPACE and currentHelmString:len() == 0) then
 				button = BACKSPACE
 				-- Does not return
 			elseif button == ENTER then
-				self:CallMethod("debugPrint", "Enter pressed in helm mode, string is", currentHelmString)
 				arg1 = currentHelmString
 				arg2 = currentNode.bindings
 				self:Run(helmMenuSearch)
@@ -264,7 +306,6 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 				local size = 0
 				for i,v in pairs(matchingOptions) do
 					size = size + 1
-					self:CallMethod("debugPrint", "matching option " .. i .. " is", v)
 				end
 
 				local index = currentHelmPosition % size
@@ -330,6 +371,7 @@ AfterLeaderKeyHandlerFrame:Execute([===[
 )
 --AfterLeaderKeyHandlerFrame:WrapScript(AfterLeaderKeyHandlerFrame, "OnClick", "print('bla')", "print('|cFFFF0000After onclick wrap called.|r') self:SetAttribute('type', nil)") -- TODO why doesn't the after script run?
 AfterLeaderKeyHandlerFrame:WrapScript(AfterLeaderKeyHandlerFrame, "OnClick", "self:Run(OnClick, button, down) return true", "print('|cFFFF0000After onclick wrap called.|r') self:SetAttribute('type', nil)") -- TODO why doesn't the after script run?
+
 local LeaderKeyOverrideBindOwner = CreateFrame("BUTTON", "Leader Key Override Bind Owner", nil, "SecureHandlerBaseTemplate")
 LeaderKey.private.LeaderKeyOverrideBindOwner = LeaderKeyOverrideBindOwner
 

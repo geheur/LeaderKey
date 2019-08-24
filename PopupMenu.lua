@@ -41,7 +41,8 @@ setupFrames()
 
 local function clearListItems()
 	for _,listItem in pairs(listItems) do
-		listItem.Text:SetText("")
+		listItem.bindText:SetText("")
+		listItem.actionText:SetText("")
 	end
 end
 
@@ -70,13 +71,35 @@ local function prettySort(nodeList)
 	return sorted
 end
 
+-- f = CreateFrame("ScrollFrame", nil, UIParent)
+-- f:SetSize(500, 500)
+-- f:SetPoint("TOPLEFT")
+-- t = f:CreateTexture("OVERLAY", "OVERLAY")
+-- t:SetColorTexture(1,0,0)
+-- t:SetPoint("TOPLEFT")
+-- t:SetSize(900, 200)
+-- f:Show()
+
+--[[
+local pool = CreateFramePool("FRAME", LeaderKeyMenu, "LeaderKeyNextKeyListEntry", nil)
+local previous_Acquire = pool.Acquire
+function pool:Acquire(keybind, icon, actionText, bindText)
+	local f = previous_Acquire()
+	f.bindText:SetText(bindText.." -> ")
+	f.actionText:SetText(actionText)
+end
+--]]
+
+-- getTextNodeFrame(keybind, icon, text)
+
+--[[
+--]]
+
 local function displayNodes(nodeList)
-	if #nodeList == 0 then
-		local actionFrame = listItems[i]
-		if actionFrame ~= nil then
-			actionFrame.Text:SetText("Nothing here! - TODO improve.")
-		end
-	end
+	-- local nodeFrame = getTextNodeFrame(keybind, icon, text)
+	-- addNodeFrame(nodeFrame)
+	-- LeaderKeyMenu:AddChild(keybind, icon, text)
+
 	local i = 1
 	local sortedNodes = prettySort(nodeList)
 	for _,node in pairs(sortedNodes) do
@@ -86,22 +109,50 @@ local function displayNodes(nodeList)
 		end
 		local iconText = ""
 		if nextNode.icon then
-			iconText = "|T"..nextNode.icon..":0|t"
+			iconText = "|T"..nextNode.icon..":18|t "
 		end
-		local nodeName
+		local nodeName = "TODO removeme"
 		if nextNode.type == Node.MACRO then
-			nodeName = (nextNode.name or nextNode.macro or "nil")
+			if strfind(nextNode.macro, "use") then
+			else
+				nodeName = (nextNode.name or nextNode.macro or "nil")
+			end
 		else
 			nodeName = (nextNode.name or "[no name]")
 		end
 		local text = nextBind .. " -> " .. iconText .. colors[nextNode.type] .. nodeName .. colors.noColor
 
 		local actionFrame = listItems[i]
+		-- TODO display number.
+		if actionFrame ~= nil then actionFrame.actionText:SetText(text) end
+		--[[
 		if actionFrame ~= nil then
-			actionFrame.Text:SetText(text)
+			actionFrame.actionText:SetText(text)
+			if not actionFrame.itemIcon then
+				print("bla")
+				actionFrame.itemIcon = actionFrame:CreateTexture("OVERLAY")
+				actionFrame.icon:SetPoint("TOPLEFT")
+				actionFrame.icon:SetSize(50,50)
+			end
+			actionFrame.itemIcon:SetTexture(select(10, GetItemInfo(818)))
+			-- SetItemButtonTexture(itemFrame, GetContainerItemInfo(1,6))
+			-- local itemFrame = CreateFrame("Button", nil, actionFrame, "ContainerFrameItemButtonTemplate")
+			-- itemFrame.icon = itemFrame:CreateTexture()
+			-- itemFrame.icon:SetSize(100, 100)
+			-- SetItemButtonTexture(itemFrame, GetContainerItemInfo(1, 6))
+			-- itemFrame:SetPoint("TOPLEFT", actionFrame, "TOPLEFT")
 		end
+		--]]
 		i = i + 1
 	end
+	--[[
+	if #nodeList == 0 then
+		local actionFrame = listItems[1]
+		if actionFrame ~= nil then
+			actionFrame.bindText:SetText("Nothing here! - TODO improve.")
+		end
+	end
+	--]]
 end
 
 -- Takes a string which is the buttons pressed so far separated by spaces.
@@ -137,8 +188,9 @@ local function displayKeySequenceState(keySequenceString, helmString)
 
 		displayNodes(node.bindings)
 	elseif node.type == Node.HELM_SUBMENU then
-		Log.debug("showing options helm submenu")
-		LeaderKeyMenuSequenceInProgressBar.Text:SetText((node.name or "nil") .. " " .. (helmString or "nil"))
+		LeaderKeyMenu:Show()
+
+		LeaderKeyMenuSequenceInProgressBar.Text:SetText((node.name or "nil") .. " " .. (helmString or "nil") .. "_")
 
 		local matchingNodes = LeaderKey.private.helmMenuSearch(helmString, node.bindings)
 		displayNodes(matchingNodes)
@@ -149,4 +201,28 @@ local function displayKeySequenceState(keySequenceString, helmString)
 	end
 end
 LeaderKey.registerForKeySequenceStateUpdate(displayKeySequenceState)
+
+-- TODO refactor into separate file
+--[[
+[ K L A ] [ item |v|] [ itemname ] [nodename]
+See if you can use a headless inventory plugin to get the item without having to type the whole name.
+
+Alternative, for when the menu is started from inside a partial keybinding, and you're adding a ndoe:
+K L [   ] [ item |v|] [ itemname ] [nodename]
+
+In searchable submenu:
+[ K L (gray text, disabled)] [item |v] [ itemname ] [node name]
+
+softlink:
+[ K L A ] [softlink|v] [ inventory ]
+
+Focus transfer with Tab, s-Tab.
+The dropdown should be typable with autocomplete.
+
+Below this first line should go any other attributes.
+
+Custom node:
+[ K L A ]
+--]]
+local LeaderKeyNodeEditFrame = CreateFrame("Frame") -- TODO use xml or ace?
 

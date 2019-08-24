@@ -10,12 +10,6 @@ local dynamicMenuPrefix = {"D"}
 local function CreateRootMenu()
 	local rootmenu = BindingsTree:cast(Node.CreateSubmenu("Root"))
 	local dynamicMenuNode = Node.CreateHelmSubmenu("Dynamic Menus")
-	rootmenu:AddBind(dynamicMenuNode, dynamicMenuPrefix)
-	rootmenu:AddBind(Node.CreateSoftlink("mysoftlink", {"D", "BLA"}), {"L", "S"})
-
-	local submenu = Node.CreateSubmenu"submenu"
-	dynamicMenuNode.bindings.BLA = submenu
-	submenu.bindings.M = Node.CreateMacroNode("print", "/dump \"hello\"")
 
 	return rootmenu
 end
@@ -33,7 +27,6 @@ local function CreateBindingsTree()
 
 	LeaderKey.ViragCurrentBindingsPointer = CurrentBindings
 end
--- CreateBindingsTree()
 
 local function BuildCurrentBindingsTree()
 	CreateBindingsTree()
@@ -47,10 +40,24 @@ local function BuildCurrentBindingsTree()
 end
 
 -- Updates keybind tree in AfterLeaderKeyHandlerFrame's restricted environment, and makes sure leader keys are bound. Out of combat only, obviously.
-local pendingUpdate = false;
---[[
-returns if the update was successful. If it wasn't the update will happen when combat drops.
+local updateQueue = {}
+local function doOutOfCombat(func)
+	if InCombatLockdown() then
+		tinsert(updateQueue, func)
+	else
+		func()
+	end
+end
+function LeaderKey.private.flushOutOfCombatQueue()
+	if #updateQueue == 0 then return end
 
+	Log.debug("flushing out of combat queue (" .. #updateQueue .. " items)")
+	for i,func in ipairs(updateQueue) do
+		Log.debug("flushing item " .. i)
+		func()
+	end
+end
+--[[
 -- TODO callback for the update being successful.
 
 -- TODO make local again or remove UpdateCurrentBindings.
@@ -58,10 +65,6 @@ returns if the update was successful. If it wasn't the update will happen when c
 -- TODO visual menu sees updates too early. There needs to be a separate tree for that. Best way is to not update the tree in combat!
 --]]
 function LeaderKey.UpdateKeybinds()
-	if InCombatLockdown() then
-		pendingUpdate = true
-		return true
-	end
 	BuildCurrentBindingsTree()
 
 	LeaderKey.private.LeaderKeyOverrideBindOwner:Execute("self:ClearBindings()")
@@ -80,11 +83,6 @@ end
 
 function LeaderKey.GetCurrentBindingsTree()
 	return CurrentBindings
-end
-
--- Run this after changing adding/removing/changing binds to apply them. 
-function LeaderKey.UpdateCurrentBindings()
-	LeaderKey.UpdateKeybinds()
 end
 
 function LeaderKey.GetAccountBindingsTree()
@@ -179,7 +177,7 @@ dmHandle.registerCallback(function(node, sequence) print("selected:", node.name)
 
 -- Should softlinks check if they're looking in a dynamic menu? If a menu is missing that should produce a different error message.
 
--- Should lazy loading be allowed? I say no, responsiveness is #1.
+-- Should lazy loading be allowed? I say no, responsiveness and being combat-available is #1.
 
 -- Should I allow internal softlinks? I suppose they could work, if the softlinks were discovered by update or updatePartial, and had their
 -- targets edited. Or, I could offer a softlink creation function that is dynamic menu aware.
@@ -195,14 +193,11 @@ LeaderKey.DynamicMenuRegistry = {}
 function LeaderKey.RegisterDynamicMenu(name, node)
 	local sequence = prepend(dynamicMenuPrefix, {name}) -- name is used as the keybind only because it'll be unique. it's a searchable menu anyways so this won't affect usability.
 	LeaderKey.DynamicMenuRegistry[name] = node
-	RootNode:AddBind(node, sequence)
-	LeaderKey.UpdateKeybinds()
+	doOutOfCombat(function()
+		RootNode:AddBind(node, sequence)
+		LeaderKey.UpdateKeybinds()
+	end)
 end
-
-local mydynamicmenu = Node.CreateSubmenu("test dynamic menu")
-mydynamicmenu.bindings.A = Node.CreateMacroNode("A", "/script print('a')")
-mydynamicmenu.bindings.B = Node.CreateMacroNode("B", "/script print('b')")
-function bla() LeaderKey.RegisterDynamicMenu("testdynamic", mydynamicmenu) end
 
 function LeaderKey.UpdateDynamicMenu(token)
 	print("NYI - UpdateDynamicMenu")

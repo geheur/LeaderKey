@@ -6,7 +6,6 @@ local tableSize = LeaderKey.private.tableSize
 local Log = LeaderKey.private.Log
 
 -- ### Node constructors.
-
 local SUBMENU = Node.submenu
 local HELM_SUBMENU = Node.helmSubmenu
 local MACRO = Node.macro
@@ -197,7 +196,6 @@ end
 
 local function CopyInBindingsTree(currentBindingsTree, bindingsTree)
 	for key,node in pairs(bindingsTree.bindings) do
-		Log.debug("key,node", key, node)
 		local currentNode = currentBindingsTree.bindings[key]
 		if node.type == Node.SUBMENU then
 			if currentNode ~= nil and currentNode.type ~= Node.SUBMENU then
@@ -215,7 +213,7 @@ local function CopyInBindingsTree(currentBindingsTree, bindingsTree)
 				Log.warn("check BindingsTree.xml.") -- TODO.
 				--print("|cFFFFA500LeaderKey: Warning: overwrote binding " .. (key or "") .. ": " .. (currentNode.name or "nil") .. " in submenu " .. (currentBindingsTree.name or "nil") .. "|r")
 			end
-			Log.debug("binding", currentBindingsTree.name or "", key, "to", node.name)
+			-- Log.debug("binding", currentBindingsTree.name or "", key, "to", node.name)
 			currentBindingsTree.bindings[key] = node -- TODO make sure no one changes this node...
 		end
 	end

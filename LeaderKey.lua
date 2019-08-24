@@ -3,6 +3,31 @@ if not LeaderKey.private then LeaderKey.private = {} end
 
 local ns = LeaderKey.private
 
+--[[
+Slash command:
+/lkb[ind] pluginname [customNodeName]
+/lkb[ind] spell spellname [customNodeName]
+/lkb[ind] item itemname [customNodeName] -- Take item links? Links are easy to insert.
+/lkb[ind] macro macrotext [customNodeName]
+
+/lkname
+
+/lkl[ist]
+/lkl[ist] s[ubtree]
+	Asks for key sequence.
+/lkl[ist] p[lugins] -- mostly redundant with going to the root.
+
+/lkr[oot] -- Out of combat only.
+
+/lkb[ind] [help]
+/lku[nbind]
+/lkre[bind]
+
+/lkh[elp]
+
+All of these could also be available as /lk b[ind].
+--]]
+
 LeaderKey.VDT = {}
 
 ns.runTests = true
@@ -49,6 +74,8 @@ end
 
 local events = {}
 function events:PLAYER_ENTERING_WORLD(...)
+LeaderKey.private.AfterLeaderKeyHandlerFrame:SetFrameRef("ref", MovePadJump) -- This isn't really a good way to do it because it has to happen out of combat.
+	LeaderKey.private.Log.debug("PLAYER_ENTERING_WORLD")
 	local debug = true
 	if ViragDevTool_AddData and debug then
 		ViragDevTool_AddData(LeaderKey.ViragCurrentBindingsPointer.bindings, "LKMAP")
@@ -58,6 +85,38 @@ function events:PLAYER_ENTERING_WORLD(...)
 		ViragDevTool_AddData(LeaderKey.VDT, "LeaderKey")
 		--ViragDevTool_AddData(ViragCurrentSpecBindingsPointer.bindings, "LKMAP")
 	end
+
+local Node = LeaderKey.BindingsTree.Node
+
+local mydynamicmenu = Node.CreateHelmSubmenu("inventory")
+
+for bag = 0, NUM_BAG_SLOTS do
+	for slot = 1, GetContainerNumSlots(bag) do
+		local icon, itemCount, locked, quality, readable, lootable, itemLink, isFiltered, noValue, itemID = GetContainerItemInfo(bag, slot)
+		if itemID then
+			local itemName, itemLink, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount,
+			itemEquipLoc, itemIcon, itemSellPrice, itemClassID, itemSubClassID, bindType, expacID, itemSetID, 
+			isCraftingReagent = GetItemInfo(itemID) 
+
+	-- https://wowwiki.fandom.com/wiki/ItemType
+			-- TODO on use items.
+			-- TODO equipment sets.
+			-- equipped items (in case you unequip them in combat).
+			-- Combat filter? For Armor.
+			if not itemName then print(itemID) end
+			if itemType == "Armor" or itemType == "Weapon" then
+				local node = Node.CreateMacroNode(itemName, "/equip "..itemName)
+				node.icon = itemIcon
+				tinsert(mydynamicmenu.bindings, node)
+			elseif itemType == "Consumable" then
+				tinsert(mydynamicmenu.bindings, Node.CreateMacroNode(itemName, "/use "..itemName))
+			end
+			-- print(itemName, itemType, itemSubType)
+		end
+	end
+end
+LeaderKey.RegisterDynamicMenu("inventory", mydynamicmenu) -- TODO should the name be optional? It's currently included twice.
+
 end
 do
 	local addonIsLoaded = false
@@ -68,7 +127,7 @@ do
 		-- LeaderKey.loadstuff() -- load in my keybindings if something goes wrong and I have to restore from backup.
 
 		LeaderKeyData = LeaderKeyData or {} -- TODO initialize account/class/spec/character bindings?
-		LeaderKey.UpdateCurrentBindings()
+		LeaderKey.UpdateKeybinds()
 
 		addonIsLoaded = true
 	end
@@ -76,11 +135,11 @@ end
 function events:PLAYER_SPECIALIZATION_CHANGED(...)
 	if ... ~= "player" then return end
 	-- TODO detect spec vs talent change.
-	Log.debug("PLAYER_SPECIALIZATION_CHANGED new spec", GetSpecialization())
-	LeaderKey.UpdateCurrentBindings()
+	-- Log.debug("PLAYER_SPECIALIZATION_CHANGED new spec", GetSpecialization())
+	-- LeaderKey.UpdateKeybinds()
 end
 function events:PLAYER_REGEN_ENABLED(...)
-	LeaderKey.UpdateKeybinds()
+	LeaderKey.private.flushOutOfCombatQueue()
 end
 
 registerEventHandlers(events)

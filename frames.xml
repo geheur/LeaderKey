@@ -31,32 +31,39 @@
 						<Anchor point="TOPLEFT"/>
 						<Anchor point="BOTTOMRIGHT" relativePoint="TOPRIGHT" y="-5"/>
 					</Anchors>
-					<Color r="0.0" g="0.0" b="1.0" a="1.0"/>
+					<Color r="0.0" g="0.0" b="1.0" a="0.3"/>
 			 	</Texture>
 			 	<Texture name="$parentBorderLeft"  file="Interface\ChatFrame\ChatFrameBackground">
 					<Anchors>
 						<Anchor point="TOPLEFT" y="-5"/>
 						<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMLEFT" x="5" y="5"/>
 					</Anchors>
-					<Color r="0.0" g="0.0" b="1.0" a="1.0"/>
+					<Color r="0.0" g="0.0" b="1.0" a="0.3"/>
 			 	</Texture>
 			 	<Texture name="$parentBorderBottom"  file="Interface\ChatFrame\ChatFrameBackground">
 					<Anchors>
 						<Anchor point="BOTTOMLEFT"/>
 						<Anchor point="TOPRIGHT" relativePoint="BOTTOMRIGHT" y="5"/>
 					</Anchors>
-					<Color r="0.0" g="0.0" b="1.0" a="1.0"/>
+					<Color r="0.0" g="0.0" b="1.0" a="0.3"/>
 			 	</Texture>
 			 	<Texture name="$parentBorderTop"  file="Interface\ChatFrame\ChatFrameBackground">
 					<Anchors>
 						<Anchor point="TOPRIGHT" y="-5"/>
 						<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMRIGHT" x="-5" y="5"/>
 					</Anchors>
-					<Color r="0.0" g="0.0" b="1.0" a="1.0"/>
+					<Color r="0.0" g="0.0" b="1.0" a="0.3"/>
 			 	</Texture>
 			</Layer>
 		</Layers>
 	</Frame>
+
+	<FontString name="LeaderKeyMenuText" inherits="MonacoMedium" virtual="true">
+	<!--<FontString name="$parentText" text="Action" inherits="QuestFont_Shadow_Huge" parentKey="Text">-->
+		<FontHeight>
+			<AbsValue val="50"/>
+		</FontHeight>
+	</FontString>
 
 	<Frame name="LeaderKeyNextKeyListEntry" virtual="true">
 		<Size>
@@ -64,22 +71,31 @@
 		</Size>
 
 		<Layers>
-			<Layer level="BACKGROUND">
 				<!--
+			<Layer level="BACKGROUND">
 			 	<Texture name="$parentBackground"  file="Interface\ChatFrame\ChatFrameBackground" setAllPoints="true">
 					<Color r="0.5" g="0.0" b="0.5" a=".25"/>
 			 	</Texture>
-				-->
 			</Layer>
+				-->
 			<Layer level="ARTWORK">
-				<FontString name="$parentText" text="Action" inherits="MonacoMedium" parentKey="Text">
-				<!--<FontString name="$parentText" text="Action" inherits="QuestFont_Shadow_Huge" parentKey="Text">-->
+				<FontString inherits="LeaderKeyMenuText" parentKey="bindText">
 					<Anchors>
-						<Anchor point="LEFT" x="20"/>
+						<Anchor point="LEFT" relativePoint="LEFT" x="2"/>
 					</Anchors>
-		<FontHeight>
-			<AbsValue val="50"/>
-		</FontHeight>
+				</FontString>
+				<Texture parentKey="itemIcon">
+					<Anchors>
+						<Anchor point="LEFT" relativePoint="RIGHT" x="2" relativeKey="$parent.bindText"/>
+					</Anchors>
+					<Size>
+						<AbsDimension x="26" y="26"/>
+					</Size>
+				</Texture>
+				<FontString inherits="LeaderKeyMenuText" parentKey="actionText">
+					<Anchors>
+						<Anchor point="LEFT" relativePoint="RIGHT" x="2" relativeKey="$parent.itemIcon"/>
+					</Anchors>
 				</FontString>
 			</Layer>
 		 </Layers>
@@ -93,13 +109,13 @@
 			<AbsDimension x="1000" y="350"/>
 		</Size>
 		<Anchors>
-			<Anchor point="TOPLEFT"/>
+			<Anchor point="CENTER"/>
 		</Anchors>
 
 		<Layers>
 			<Layer level="BACKGROUND">
 			 	<Texture name="$parentBackground"  file="Interface\ChatFrame\ChatFrameBackground" setAllPoints="true">
-					<Color r=".45" g=".6" b=".8" a="1.0"/>
+					<Color r=".45" g=".6" b=".8" a="0.3"/>
 			 	</Texture>
 			</Layer>
 		 </Layers>
