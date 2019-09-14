@@ -326,3 +326,221 @@ LeaderKey.registerSlashCommand("/lkbind", function(msg) handleSlashCommand("bind
 LeaderKey.registerSlashCommand("/lkunbind", function(msg) handleSlashCommand("unbind", msg) end)
 LeaderKey.registerSlashCommand("/lkrebind", function(msg) handleSlashCommand("rebind", msg) end)
 
+local Node = LeaderKey.BindingsTree.Node
+local item = "todo" -- TODO.
+local spell = "todo" -- TODO.
+
+local AceGui = LibStub("AceGUI-3.0")
+
+local function button(name, width, onclickcallback)
+	local b = AceGui:Create("Button")
+	b:SetWidth(width)
+	b:SetText(name)
+	b:SetCallback("OnClick", onclickcallback)
+	return b
+end
+
+local function lkKeybindPrefixLabel(keysequence, width)
+	local b = AceGui:Create("Label")
+	b:SetWidth(width)
+	b:SetText(keysequence)
+	b:SetCallback("OnKeyChanged", function(self,callback,keybind) nodeattributes[key] = keybind end)
+	return b
+end
+
+local function lkKeybind(name, width, nodeattributes, key)
+	local b = AceGui:Create("Keybinding")
+	b:SetWidth(width)
+	b:SetCallback("OnKeyChanged", function(self,callback,keybind) nodeattributes[key] = keybind end)
+	return b
+end
+
+local function lkMacroscript(name, width, nodeattributes, key)
+	local b = AceGui:Create("MultiLineEditBox")
+	b:SetWidth(width)
+	b:SetLabel(name)
+	b:SetWidth(width)
+	b:SetNumLines(5)
+	b:SetCallback("OnTextChanged", function(self,callback,text) nodeattributes[key] = text end)
+	return b
+end
+
+local function lkEditBox(name, width, nodeattributes, key)
+	local b = AceGui:Create("EditBox")
+	b:SetWidth(width)
+	b:SetLabel(name)
+	b:SetCallback("OnTextChanged", function(self,callback,text) nodeattributes[key] = text end)
+	return b
+end
+
+-- TODO add a second function to each type: the node generator.
+local menuGenerators = {
+	-- actions
+	[Node.macro] = function(parent, isSearchableChild, nodeattributes, keysequence)
+		local s = ""
+		for i,v in pairs(keysequence) do
+			s = s .. " " .. v
+		end
+		parent:AddChild(lkKeybindPrefixLabel(s, 500))
+		parent:AddChild(lkKeybind("Keybind:", 100, nodeattributes, "keybind"))
+		parent:AddChild(lkMacroscript("Macro text:", 300, nodeattributes, "macrotext"))
+		parent:AddChild(lkEditBox("Node name:", 300, nodeattributes, "nodename"))
+	end,
+	[item] = function(parent, isSearchableChild, nodeattributes) -- same used for spells.
+		print("nyi")
+		-- keybind
+		-- item/spell name
+	end,
+
+	-- technical types.
+	[Node.submenu] = function(parent, isSearchableChild, nodeattributes)
+		-- keybind
+		-- name
+	end,
+	[Node.helmSubmenu] = function(parent, isSearchableChild, nodeattributes)
+		-- keybind
+		-- name
+	end,
+	[Node.softlink] = function(parent, isSearchableChild, nodeattributes)
+		print("nyi.")
+		-- keybind
+		-- softlink
+		-- name
+	end
+}
+menuGenerators[spell] = menuGenerators[item]
+-- for plugin in plugins do if menuGenerators[pluginName] then error end menuGenerators[pluginName] = pluginfunc.
+
+local aceguiframe = AceGui:Create("Frame")
+aceguiframe:Hide()
+aceguiframe:SetTitle("edit keybind")
+aceguiframe:SetStatusText("status text")
+
+local typeDropDown = AceGui:Create("DropdownGroup")
+typeDropDown:SetWidth(200)
+typeDropDown:SetGroupList{[Node.macro]="Macro",item="Item",todo="Todo"}
+typeDropDown:SetCallback("OnGroupSelected", function(self, callback, group)
+	self:ReleaseChildren()
+
+	local nodeattributes = {}
+	local isSearchableParent = false
+
+	local keysequence = LeaderKey.private.copyKeySequence(self:GetUserDataTable().keysequence or {})
+	if menuGenerators[group] then menuGenerators[group](self, isSearchableParent, nodeattributes, keysequence or {}) end
+
+	self:AddChild(button("Create keybind.", 200, function()
+		print("nodeattributes")
+		for i,v in pairs(nodeattributes) do
+			print(i,v)
+		end
+
+		if not nodeattributes.keybind then print("no keybind") return end
+		tinsert(keysequence, nodeattributes.keybind)
+		local node = Node.CreateMacroNode(nodeattributes.nodename, nodeattributes.macrotext)
+		LeaderKey.dobind(keysequence, node)
+
+		LeaderKey.UpdateKeybinds()
+
+		-- reset state so that the editbox can be used again.
+		keysequence = LeaderKey.private.copyKeySequence(self:GetUserDataTable().keysequence)
+	end))
+end)
+typeDropDown:SetGroup("macro")
+aceguiframe:AddChild(typeDropDown)
+
+
+--[[
+/script showEditor()
+/script showEditor({"K"})
+/script showEditor({"K", "P"})
+/script showEditor({"K", "D"})
+/script showEditor({"INSERT"})
+
+/script SetRaidTarget("mouseover", 1)
+/script SetRaidTarget("mouseover", 1)
+s c d t moon q g f
+/script SetRaidTarget("mouseover", 8)
+
+/cast Rockbiter Weapon(Rank 3)
+/cast Flametongue Weapon(Rank 2)
+/cast Lightning Shield(Rank 1)
+{rt1}
+{rt2}
+{rt3}
+{rt4}
+{rt5}
+{rt6}
+{rt7}
+{rt8}
+--]]
+function showEditor(keySequence)
+	if aceguiframe:IsShown() then
+		print("already shown.")
+		return
+	end
+	aceguiframe:Show()
+	typeDropDown:GetUserDataTable().keysequence = keySequence
+	typeDropDown:SetGroup("macro")
+end
+
+local keyboardFrame = CreateFrame("Frame", "myframe", UIParent)
+keyboardFrame:EnableKeyboard(true)
+keyboardFrame:SetPropagateKeyboardInput(true)
+keyboardFrame:SetFrameStrata("TOOLTIP") -- Determines priority for receiving keyboard events.
+keyboardFrame:HookScript("OnKeyDown", function(frame, key)
+	frame:SetPropagateKeyboardInput(true)
+	if key == "C" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
+		showEditor(LeaderKey.GetCurrentKeySequence())
+		frame:SetPropagateKeyboardInput(false)
+	end
+end)
+
+
+-- TODO refactor into separate file
+--[[
+
+
+local radio = AceGui:Create("Dropdown")
+radio:SetWidth(200)
+radio:SetList{"one", "two", "three"}
+radio:SetValue(1)
+aceguiframe:AddChild(radio)
+--aceguiframe:SetLayout("Flow")
+
+
+
+
+local typeDropDown = AceGui:Create("TabGroup")
+typeDropDown:SetWidth(200)
+typeDropDown:SetTabs{{[1]="macro", text="Macro"},{[3]="item", text="Item"},{[2]="todo", text="TODO"}}
+typeDropDown:SelectTab("macro")
+aceguiframe:AddChild(typeDropDown)
+
+[ K L A ] [ item |v|] [ itemname ] [nodename]
+See if you can use a headless inventory plugin to get the item without having to type the whole name.
+
+Alternative, for when the menu is started from inside a partial keybinding, and you're adding a ndoe:
+K L [   ] [ item |v|] [ itemname ] [nodename]
+
+In searchable submenu:
+[ K L (gray text, disabled)] [item |v] [ itemname ] [node name]
+
+softlink:
+[ K L A ] [softlink|v] [ inventory ]
+
+Focus transfer with Tab, s-Tab.
+The dropdown should be typable with autocomplete.
+
+Below this first line should go any other attributes.
+
+Custom node:
+[ K L A ]
+--]]
+
+local AceConsole = LibStub("AceConsole-3.0")
+LeaderKey.registerSlashCommand("/level", function(msg)
+	level1, level2 = AceConsole:GetArgs(msg, 2)
+	s = ""
+	CensusPlus_UpdateView()
+end)
+

@@ -7,6 +7,8 @@
 ## LoadOnDemand: 0
 ## SavedVariables: LeaderKeyData
 
+embeds.xml
+
 frames.xml
 
 LeaderKey.lua
@@ -19,5 +21,5 @@ SlashCommands.lua
 
 test.lua
 
-dev/loadstuff.lua
-dev/anymodifier.lua
+## dev/loadstuff.lua
+## dev/anymodifier.lua

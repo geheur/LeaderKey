@@ -20,8 +20,8 @@
 	</FontFamily>
 	-->
 
-	<Font name="MonacoLarge" font="Fonts\monaco.ttf" height="36" virtual="true"/>
-	<Font name="MonacoMedium" font="Fonts\monaco.ttf" height="18" virtual="true"/>
+	<Font name="MonacoLarge" font="Interface\Addons\LeaderKey\Fonts\monaco.ttf" height="36" virtual="true"/>
+	<Font name="MonacoMedium" font="Interface\Addons\LeaderKey\Fonts\monaco.ttf" height="18" virtual="true"/>
 
 	<Frame name="LeaderKeyMenuBorder" virtual="true">
 		<Layers>
@@ -58,11 +58,11 @@
 		</Layers>
 	</Frame>
 
-	<FontString name="LeaderKeyMenuText" inherits="MonacoMedium" virtual="true">
+	<FontString name="LeaderKeyMenuText" font="MonacoMedium" virtual="true">
 	<!--<FontString name="$parentText" text="Action" inherits="QuestFont_Shadow_Huge" parentKey="Text">-->
-		<FontHeight>
+		<!--<FontHeight>
 			<AbsValue val="50"/>
-		</FontHeight>
+		</FontHeight>-->
 	</FontString>
 
 	<Frame name="LeaderKeyNextKeyListEntry" virtual="true">
@@ -132,7 +132,7 @@
 				
 				<Layers>
 					<Layer level="ARTWORK">
-						<FontString name="$parentText" text="Menu" inherits="MonacoLarge" parentKey="Text"/>
+						<FontString name="$parentText" font="MonacoLarge" text="Menu" parentKey="Text"/>
 					</Layer>
 				</Layers>
 			</Frame>

@@ -74,7 +74,7 @@ end
 
 local events = {}
 function events:PLAYER_ENTERING_WORLD(...)
-LeaderKey.private.AfterLeaderKeyHandlerFrame:SetFrameRef("ref", MovePadJump) -- This isn't really a good way to do it because it has to happen out of combat.
+-- LeaderKey.private.AfterLeaderKeyHandlerFrame:SetFrameRef("ref", MovePadJump) -- This isn't really a good way to do it because it has to happen out of combat.
 	LeaderKey.private.Log.debug("PLAYER_ENTERING_WORLD")
 	local debug = true
 	if ViragDevTool_AddData and debug then
@@ -131,12 +131,6 @@ do
 
 		addonIsLoaded = true
 	end
-end
-function events:PLAYER_SPECIALIZATION_CHANGED(...)
-	if ... ~= "player" then return end
-	-- TODO detect spec vs talent change.
-	-- Log.debug("PLAYER_SPECIALIZATION_CHANGED new spec", GetSpecialization())
-	-- LeaderKey.UpdateKeybinds()
 end
 function events:PLAYER_REGEN_ENABLED(...)
 	LeaderKey.private.flushOutOfCombatQueue()

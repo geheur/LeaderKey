@@ -160,3 +160,71 @@ end
 	--rsc("LEADERKEY_MAP", "'/script ToggleCollectionsJournal(1)' K C M")
 end
 
+--[[
+/script docoroutine()
+
+/dump C_FriendList.GetWhoInfo(1)
+--]]
+--[[
+local results = {}
+local lastwho
+
+f = CreateFrame("Frame")
+f:RegisterEvent("WHO_LIST_UPDATE")
+f:SetScript("OnEvent", function(table, func)
+	print("WHO_LIST_UPDATE")
+	if C_FriendList.GetNumWhoResults() == 50 then print("warning", lastwho, "at least 50 results") end
+	for i=1,C_FriendList.GetNumWhoResults() do
+		local whoresult = C_FriendList.GetWhoInfo(i)
+		local classStr = whoresult.classStr
+		results[lastwho] = results[lastwho] or {}
+		results[lastwho][classStr] = (results[lastwho][classStr] or 0) + 1
+	end
+end)
+
+local function a(text)
+	tocopyfrom = CreateFrame("EDITBOX")
+	tocopyfrom:SetAutoFocus(false)
+	tocopyfrom:Show()
+	tocopyfrom:SetParent(UIParent)
+	tocopyfrom:SetPoint("TOPLEFT", UIParent, "TOPLEFT")
+	tocopyfrom:SetSize(100, 100)
+	tocopyfrom:SetText(text)
+end
+
+function docoroutine()
+	local co
+	co = coroutine.create(function()
+		for i=30,60 do
+			lastwho = i
+			-- print("whoing", i, "will resume", co)
+			C_FriendList.SendWho(tostring(i))
+			C_Timer.After(10, function() print("resuming", co) coroutine.resume(co) end)
+
+			coroutine.yield()
+		end
+		local s = ""
+		local totals = {}
+		for i,v in pairs(results) do
+			s = s .. i .. "\n"
+			for i,v in pairs(v) do
+				totals[i] = totals[i] or 0
+				totals[i] = totals[i] + v
+				s = s .. "\t" .. i .. " " .. v .. "\n"
+			end
+		end
+		local total = 0
+		for i,v in pairs(totals) do
+			total = total + v
+		end
+		print("total", total)
+		for i,v in pairs(totals) do
+			s = s .. i .. " " .. (v / total) .. " " .. v .. "\n"
+			print(i .. " " .. (v / total) .. " " .. v)
+		end
+		a(s)
+	end)
+	coroutine.resume(co)
+end
+--]]
+

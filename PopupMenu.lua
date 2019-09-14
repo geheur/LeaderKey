@@ -46,7 +46,7 @@ local function clearListItems()
 	end
 end
 
-local function sequenceStringToArray(keySequenceString)
+function LeaderKey.private.sequenceStringToArray(keySequenceString)
 	local keySequence = {}
 	for key in keySequenceString:gmatch("%S+") do
 		keySequence[#keySequence + 1] = key
@@ -157,6 +157,8 @@ end
 
 -- Takes a string which is the buttons pressed so far separated by spaces.
 local function displayKeySequenceState(keySequenceString, helmString)
+	-- print(LeaderKey.keySequenceForPrint(LeaderKey.private.sequenceStringToArray(keySequenceString)))
+
 	-- TODO print something special when submenu has no binds.
 	if not keySequenceString then
 		Log.debug("Not displaying menu.")
@@ -170,7 +172,7 @@ local function displayKeySequenceState(keySequenceString, helmString)
 		Log.debug("Helm string detected", helmString)
 	end
 
-	local keySequence = sequenceStringToArray(keySequenceString)
+	local keySequence = LeaderKey.private.sequenceStringToArray(keySequenceString)
 
 	clearListItems()
 
@@ -201,28 +203,4 @@ local function displayKeySequenceState(keySequenceString, helmString)
 	end
 end
 LeaderKey.registerForKeySequenceStateUpdate(displayKeySequenceState)
-
--- TODO refactor into separate file
---[[
-[ K L A ] [ item |v|] [ itemname ] [nodename]
-See if you can use a headless inventory plugin to get the item without having to type the whole name.
-
-Alternative, for when the menu is started from inside a partial keybinding, and you're adding a ndoe:
-K L [   ] [ item |v|] [ itemname ] [nodename]
-
-In searchable submenu:
-[ K L (gray text, disabled)] [item |v] [ itemname ] [node name]
-
-softlink:
-[ K L A ] [softlink|v] [ inventory ]
-
-Focus transfer with Tab, s-Tab.
-The dropdown should be typable with autocomplete.
-
-Below this first line should go any other attributes.
-
-Custom node:
-[ K L A ]
---]]
-local LeaderKeyNodeEditFrame = CreateFrame("Frame") -- TODO use xml or ace?
 

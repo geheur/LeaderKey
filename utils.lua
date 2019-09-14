@@ -32,6 +32,14 @@ function ns.tableIsEmpty(tbl)
 	return true
 end
 
+function ns.copyKeySequence(keysequence)
+	local copy = {}
+	for _,v in pairs(keysequence) do
+		copy[#copy + 1] = v
+	end
+	return copy
+end
+
 function ns.Log.info(...)
 	print("[LeaderKey]:", ...)
 end

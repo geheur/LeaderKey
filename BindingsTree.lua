@@ -18,7 +18,7 @@ function Node.CreateNode(name, type)
 end
 
 function Node.CreateMacroNode(name, macro)
-	name = name or "MACRO: " .. macro
+	name = name or macro
 	local macroNode = Node.CreateNode(name, MACRO)
 	macroNode.macro = macro
 	return macroNode
