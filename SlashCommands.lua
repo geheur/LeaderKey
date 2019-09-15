@@ -450,7 +450,6 @@ keyboardFrame:HookScript("OnKeyDown", function(frame, key)
 	-- TODO just use a queue and allow this in combat.
 
 	if mode then
-	if InCombatLockdown() then print("cannot edit binds in combat.") end
 		local currentSequence = LeaderKey.GetCurrentKeySequence()
 		tinsert(currentSequence, addModifiersToBaseKeyName(key))
 		local node = LeaderKey.GetCurrentBindingsTree():GetNode(currentSequence)
@@ -467,16 +466,13 @@ keyboardFrame:HookScript("OnKeyDown", function(frame, key)
 	elseif key == "ESCAPE" and aceguiframe:IsShown() then
 		aceguiframe:Hide()
 	elseif key == "A" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
-	if InCombatLockdown() then print("cannot edit binds in combat.") end
 		showEditor(LeaderKey.GetCurrentKeySequence())
 		frame:SetPropagateKeyboardInput(false)
 	elseif key == "E" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
-	if InCombatLockdown() then print("cannot edit binds in combat.") end
 		mode = "change"
 		print("Press key to edit.")
 		frame:SetPropagateKeyboardInput(false)
 	elseif key == "D" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
-	if InCombatLockdown() then print("cannot edit binds in combat.") end
 		mode = "delete"
 		print("Press key to delete.")
 		frame:SetPropagateKeyboardInput(false)

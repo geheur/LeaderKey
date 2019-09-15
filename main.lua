@@ -39,32 +39,7 @@ local function BuildCurrentBindingsTree()
 	--CopyInBindingsTree(CurrentBindings, LeaderKey.GetCurrentSpecBindingsTree())
 end
 
--- Updates keybind tree in AfterLeaderKeyHandlerFrame's restricted environment, and makes sure leader keys are bound. Out of combat only, obviously.
-local updateQueue = {}
-local function doOutOfCombat(func)
-	if InCombatLockdown() then
-		tinsert(updateQueue, func)
-	else
-		func()
-	end
-end
-function LeaderKey.private.flushOutOfCombatQueue()
-	if #updateQueue == 0 then return end
-
-	Log.debug("flushing out of combat queue (" .. #updateQueue .. " items)")
-	for i,func in ipairs(updateQueue) do
-		Log.debug("flushing item " .. i)
-		func()
-	end
-end
---[[
--- TODO callback for the update being successful.
-
--- TODO make local again or remove UpdateCurrentBindings.
-
--- TODO visual menu sees updates too early. There needs to be a separate tree for that. Best way is to not update the tree in combat!
---]]
-function LeaderKey.UpdateKeybinds()
+local function UpdateKeybinds_OutOfCombat()
 	BuildCurrentBindingsTree()
 
 	LeaderKey.private.LeaderKeyOverrideBindOwner:Execute("self:ClearBindings()")
@@ -77,6 +52,42 @@ function LeaderKey.UpdateKeybinds()
 	LeaderKey.private.AfterLeaderKeyHandlerFrame:Execute("self:Run(ClearSequenceInProgress)")
 end
 
+-- Updates keybind tree in AfterLeaderKeyHandlerFrame's restricted environment, and makes sure leader keys are bound. Out of combat only, obviously.
+local updateQueue = {}
+local updateKeybindsQueued = false
+local function doOutOfCombat(func)
+	if InCombatLockdown() then
+		tinsert(updateQueue, func)
+	else
+		func()
+	end
+end
+function LeaderKey.private.flushOutOfCombatQueue()
+	if updateKeybindsQueued then
+		UpdateKeybinds_OutOfCombat()
+		updateKeybindsQueued = false
+	end
+
+	if #updateQueue == 0 then return end
+
+	Log.debug("flushing out of combat queue (" .. #updateQueue .. " items)")
+	for i,func in ipairs(updateQueue) do
+		Log.debug("flushing item " .. i)
+		func()
+	end
+end
+--[[
+-- TODO callback for the update being successful.
+
+-- TODO visual menu sees updates too early. There needs to be a separate tree for that. Best way is to not update the tree in combat!
+--]]
+function LeaderKey.UpdateKeybinds()
+	if InCombatLockdown() then
+		updateKeybindsQueued = true
+	else
+		UpdateKeybinds_OutOfCombat()
+	end
+end
 
 -- ### public api.
 -- TODO Should I expose the bindings trees like this? It feel very weird to call a function which requires the return value of another function. What if I made strings to represent each scope instead?
@@ -195,8 +206,8 @@ function LeaderKey.RegisterDynamicMenu(name, node)
 	LeaderKey.DynamicMenuRegistry[name] = node
 	doOutOfCombat(function()
 		RootNode:AddBind(node, sequence)
-		LeaderKey.UpdateKeybinds()
 	end)
+	LeaderKey.UpdateKeybinds()
 end
 
 function LeaderKey.UpdateDynamicMenu(token)
