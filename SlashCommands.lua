@@ -244,87 +244,11 @@ local function handleSlashCommand(command, txt)
 		Log.error("this shouldn't happen")
 	end
 end
-
-local function InteractiveAddNode(currentSequence)
-	-- TODO coroutines are not needed here.
-	coroutine.create(function() -- establish variable. "local co =" wouldn't work because the rvalue is evaluated before the local variable is created.
-														    -- Ex: /script local p = function() print("p:", p) end p() -- prints nil
-		if InCombatLockdown() then
-			print("Cannot change binds in combat, try again later!")
-			return
-		end
-		OpenEditMenu(currentSequence, co)
-
-		local node, sequence = yield()
-
-		-- Add node.
-		if not node then return end
-		if InCombatLockdown() then
-			print("Cannot change binds in combat, try again later!")
-			return
-		end
-		LeaderKey.GetAccountBindingsTree():AddNode(node, sequence)
-		LeaderKey.SelectSequence(currentSequence)
-	end)
-	coroutine.resume(co)
-end
-
-local deleteMode = false
-local function InteractiveRmNode()
-	if InCombatLockdown() then
-		print("Cannot change binds in combat, try again later!")
-		return
-	end
-
-	LeaderKey.DisableNodeActions()
-	-- Popup menu indicator of delete mode.
-end
-LeaderKey.registerForKeySequenceStateUpdate(function()
-	-- If deleteMode is true:
-	-- Delete node.
-	-- Reset to deleted node's parent.
-	-- Possibly disable deleteMode.
-	-- un-disable menu if appropriate.
-end)
-
-local function InteractiveEditNode()
-	if InCombatLockdown() then
-		print("Cannot change binds in combat, try again later!")
-		return
-	end
-end
-
---[[
-m-a - add node. Open interface to create node.
-
-m-e - enter key for node. Open interface to create node.
-	You'll have to block non-menu node (e.g. macro node) execution in the secure frame - as well as any other actions (if you add action submenus).
-
-m-d - enter key for node.
-
-	Copying nodes.
---]]
-
---[[
-/lkl[ist]
-/lkl[ist] s[ubtree]
-	Asks for key sequence.
-/lkl[ist] p[lugins] -- mostly redundant with going to the root.
-
-/lkr[oot] -- Out of combat only.
-
-/lkb[ind] [help]
-/lku[nbind]
-/lkre[bind]
-
-/lkh[elp]
-
-All of these could also be available as /lk b[ind].
---]]
-
 LeaderKey.registerSlashCommand("/lkbind", function(msg) handleSlashCommand("bind", msg) end)
 LeaderKey.registerSlashCommand("/lkunbind", function(msg) handleSlashCommand("unbind", msg) end)
 LeaderKey.registerSlashCommand("/lkrebind", function(msg) handleSlashCommand("rebind", msg) end)
+
+-- END SLASH COMMAND STUFF.
 
 local Node = LeaderKey.BindingsTree.Node
 local item = "todo" -- TODO.
@@ -344,7 +268,6 @@ local function lkKeybindPrefixLabel(keysequence, width)
 	local b = AceGui:Create("Label")
 	b:SetWidth(width)
 	b:SetText(keysequence)
-	b:SetCallback("OnKeyChanged", function(self,callback,keybind) nodeattributes[key] = keybind end)
 	return b
 end
 
@@ -381,10 +304,30 @@ local menuGenerators = {
 		for i,v in pairs(keysequence) do
 			s = s .. " " .. v
 		end
-		parent:AddChild(lkKeybindPrefixLabel(s, 500))
-		parent:AddChild(lkKeybind("Keybind:", 100, nodeattributes, "keybind"))
-		parent:AddChild(lkMacroscript("Macro text:", 300, nodeattributes, "macrotext"))
-		parent:AddChild(lkEditBox("Node name:", 300, nodeattributes, "nodename"))
+		local prefix = lkKeybindPrefixLabel(s, 500)
+		local keybind = lkKeybind("Keybind:", 100, nodeattributes, "keybind")
+		local macro = lkMacroscript("Macro text:", 300, nodeattributes, "macrotext")
+		local nodeName = lkEditBox("Node name:", 300, nodeattributes, "nodename")
+		if parent:GetUserDataTable().node then
+			local keysequenceprefix = LeaderKey.private.copyKeySequence(keysequence)
+			keysequenceprefix[#keysequenceprefix] = nil
+			s = ""
+			for i,v in pairs(keysequenceprefix) do
+				s = s .. " " .. v
+			end
+			nodeattributes.prefix = keysequenceprefix
+			nodeattributes.keybind = keysequence[#keysequence]
+			nodeattributes.macrotext = parent:GetUserDataTable().node.macro
+			nodeattributes.nodename = parent:GetUserDataTable().node.name
+			prefix:SetText(s)
+			keybind:SetKey(keysequence[#keysequence])
+			macro:SetText(parent:GetUserDataTable().node.macro)
+			nodeName:SetText(parent:GetUserDataTable().node.name)
+		end
+		parent:AddChild(prefix)
+		parent:AddChild(keybind)
+		parent:AddChild(macro)
+		parent:AddChild(nodeName)
 	end,
 	[item] = function(parent, isSearchableChild, nodeattributes) -- same used for spells.
 		print("nyi")
@@ -431,11 +374,12 @@ typeDropDown:SetCallback("OnGroupSelected", function(self, callback, group)
 	self:AddChild(button("Create keybind.", 200, function()
 		print("nodeattributes")
 		for i,v in pairs(nodeattributes) do
-			print(i,v)
+			print("\t", i,v)
 		end
 
 		if not nodeattributes.keybind then print("no keybind") return end
-		tinsert(keysequence, nodeattributes.keybind)
+		local fullkeysequence = LeaderKey.private.copyKeySequence(nodeattributes.prefix)
+		tinsert(fullkeysequence, nodeattributes.keybind)
 		local node = Node.CreateMacroNode(nodeattributes.nodename, nodeattributes.macrotext)
 		LeaderKey.dobind(keysequence, node)
 
@@ -448,49 +392,93 @@ end)
 typeDropDown:SetGroup("macro")
 aceguiframe:AddChild(typeDropDown)
 
+aceguiframe:SetCallback("OnShow", function(self)
+	local keySequence = typeDropDown:GetUserDataTable().keysequence
+	local node = typeDropDown:GetUserDataTable().node
 
---[[
-/script showEditor()
-/script showEditor({"K"})
-/script showEditor({"K", "P"})
-/script showEditor({"K", "D"})
-/script showEditor({"INSERT"})
+	if node then
+		typeDropDown:SetGroup(node.type)
+	end
+end)
 
-/script SetRaidTarget("mouseover", 1)
-/script SetRaidTarget("mouseover", 1)
-s c d t moon q g f
-/script SetRaidTarget("mouseover", 8)
-
-/cast Rockbiter Weapon(Rank 3)
-/cast Flametongue Weapon(Rank 2)
-/cast Lightning Shield(Rank 1)
-{rt1}
-{rt2}
-{rt3}
-{rt4}
-{rt5}
-{rt6}
-{rt7}
-{rt8}
---]]
-function showEditor(keySequence)
+function showEditor(keySequence, node)
 	if aceguiframe:IsShown() then
 		print("already shown.")
 		return
 	end
-	aceguiframe:Show()
 	typeDropDown:GetUserDataTable().keysequence = keySequence
+	typeDropDown:GetUserDataTable().node = node
+	aceguiframe:Show()
 	typeDropDown:SetGroup("macro")
 end
 
+--[[
+/lkl[ist]
+/lkl[ist] s[ubtree]
+	Asks for key sequence.
+/lkl[ist] p[lugins] -- mostly redundant with going to the root.
+
+/lkr[oot] -- Out of combat only.
+
+/lkb[ind] [help]
+/lku[nbind]
+/lkre[bind]
+
+/lkh[elp]
+
+All of these could also be available as /lk b[ind].
+--]]
+
+local function addModifiersToBaseKeyName(baseKeyName)
+	local t = {}
+	-- Order matters! "SHIFT-ALT-T" is not a valid keybind!
+	t[#t+1] = IsAltKeyDown() and "ALT" or nil
+	t[#t+1] = IsControlKeyDown() and "CTRL" or nil
+	t[#t+1] = IsShiftKeyDown() and "SHIFT" or nil
+	t[#t+1] = baseKeyName
+	return table.concat(t, "-")
+end
+
 local keyboardFrame = CreateFrame("Frame", "myframe", UIParent)
+local mode
 keyboardFrame:EnableKeyboard(true)
 keyboardFrame:SetPropagateKeyboardInput(true)
 keyboardFrame:SetFrameStrata("TOOLTIP") -- Determines priority for receiving keyboard events.
 keyboardFrame:HookScript("OnKeyDown", function(frame, key)
 	frame:SetPropagateKeyboardInput(true)
-	if key == "C" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
+
+	-- TODO just use a queue and allow this in combat.
+
+	if mode then
+	if InCombatLockdown() then print("cannot edit binds in combat.") end
+		local currentSequence = LeaderKey.GetCurrentKeySequence()
+		tinsert(currentSequence, addModifiersToBaseKeyName(key))
+		local node = LeaderKey.GetCurrentBindingsTree():GetNode(currentSequence)
+		if not node then print("no binding on that key.") end
+		if mode == "delete" then
+			LeaderKey.GetAccountBindingsTree():DeleteNode(currentSequence)
+			LeaderKey.UpdateKeybinds()
+			print("deleted node")
+		elseif mode == "change" then
+			showEditor(currentSequence, node)
+		end
+		mode = nil
+		frame:SetPropagateKeyboardInput(false)
+	elseif key == "ESCAPE" and aceguiframe:IsShown() then
+		aceguiframe:Hide()
+	elseif key == "A" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
+	if InCombatLockdown() then print("cannot edit binds in combat.") end
 		showEditor(LeaderKey.GetCurrentKeySequence())
+		frame:SetPropagateKeyboardInput(false)
+	elseif key == "E" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
+	if InCombatLockdown() then print("cannot edit binds in combat.") end
+		mode = "change"
+		print("Press key to edit.")
+		frame:SetPropagateKeyboardInput(false)
+	elseif key == "D" and IsAltKeyDown() and LeaderKey.IsMenuOpen() then
+	if InCombatLockdown() then print("cannot edit binds in combat.") end
+		mode = "delete"
+		print("Press key to delete.")
 		frame:SetPropagateKeyboardInput(false)
 	end
 end)
@@ -536,11 +524,3 @@ Below this first line should go any other attributes.
 Custom node:
 [ K L A ]
 --]]
-
-local AceConsole = LibStub("AceConsole-3.0")
-LeaderKey.registerSlashCommand("/level", function(msg)
-	level1, level2 = AceConsole:GetArgs(msg, 2)
-	s = ""
-	CensusPlus_UpdateView()
-end)
-
