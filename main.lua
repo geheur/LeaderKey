@@ -55,7 +55,7 @@ end
 -- Updates keybind tree in AfterLeaderKeyHandlerFrame's restricted environment, and makes sure leader keys are bound. Out of combat only, obviously.
 local updateQueue = {}
 local updateKeybindsQueued = false
-local function doOutOfCombat(func)
+function LeaderKey.private.doOutOfCombat(func)
 	if InCombatLockdown() then
 		tinsert(updateQueue, func)
 	else
@@ -149,11 +149,6 @@ function LeaderKey.GetCharacterBindingsTree(node, keySequence)
 end
 --]]
 
---[[
-creationCallback is a function called whenever a dynamic menu is created. This happens when one is bound, either due to user action or due to the addon loading its binds.
-creationCallback takes 1 argument: a token which represents the menu, used to request LeaderKey to reload the menu.
---]]
-
 local function prepend(prefix, keySequence)
 	local result = {}
 	for i=1,#prefix do
@@ -174,60 +169,51 @@ function LeaderKey.GetDynamicMenuHandle(name)
 	return RootNode:GetNode(sequence)
 end
 
---[[
-dmHandle = LeaderKey.RegisterDynamicMenu("inventoryplugin") -- This will throw if you use an existing name or a node type.
-local pluginRoot = dmHandle.getPluginRoot() -- returns a copy.
-pluginRoot.bindings["C"] = Node.CreateSubmenu("Consumables")
-local callback = dmHandle.update(pluginRoot) -- Should probably set the name of the root node just in case.
-if callback then
-	-- wait, we didn't update yet
 
-	-- I wonder if processes can be used here?
-end
 
-pluginRoot.bindings["C"] = Node.CreateSubmenu("Consumables")
-callback = dmHandle.updatePartial({"Consumables"}, pluginRoot) -- TODO consider allowing menu names instead of keybinds - both here an in stuff like bindings["Consumables"].
-
-dmHandle.registerCallback(function(node, sequence) print("selected:", node.name) end)
-
--- Should softlinks check if they're looking in a dynamic menu? If a menu is missing that should produce a different error message.
-
--- Should lazy loading be allowed? I say no, responsiveness and being combat-available is #1.
-
--- Should I allow internal softlinks? I suppose they could work, if the softlinks were discovered by update or updatePartial, and had their
--- targets edited. Or, I could offer a softlink creation function that is dynamic menu aware.
-
-/lkdynamiclist
-
-/lkbind inventoryplugin "My Inventory"(optional parameter)
-	-- this should have a helpful error message listing the different types you can create nodes for.
-
---]]
-
-local listeners = {}
-LeaderKey.DynamicMenuRegistry = {}
-function LeaderKey.RegisterDynamicMenu(name, node)
-	local sequence = prepend(dynamicMenuPrefix, {name}) -- name is used as the keybind only because it'll be unique. it's a searchable menu anyways so this won't affect usability.
-	LeaderKey.DynamicMenuRegistry[name] = node
-	doOutOfCombat(function()
-		RootNode:AddBind(node, sequence)
-	end)
-	LeaderKey.UpdateKeybinds()
-
-	for _,listener in ipairs(listeners) do
-		listener(name, node)
+-- ### Register event handlers
+local function registerEventHandlers(events)
+	local frame = CreateFrame("Frame")
+	frame:SetScript("OnEvent", function(self, event, ...)
+	 events[event](self, ...); -- call one of the functions above
+	end);
+	for k, v in pairs(events) do
+	 frame:RegisterEvent(k); -- Register all events for which handlers have been defined
 	end
 end
 
-function LeaderKey.RegisterForDynamicMenuAdded(f)
-	for name,node in pairs(LeaderKey.DynamicMenuRegistry) do
-		f(name, node)
+local events = {}
+function events:PLAYER_ENTERING_WORLD(...)
+-- LeaderKey.private.AfterLeaderKeyHandlerFrame:SetFrameRef("ref", MovePadJump) -- This isn't really a good way to do it because it has to happen out of combat.
+	LeaderKey.private.Log.debug("PLAYER_ENTERING_WORLD")
+	local debug = true
+	if ViragDevTool_AddData and debug then
+		ViragDevTool_AddData(LeaderKey.ViragCurrentBindingsPointer.bindings, "LKMAP")
+		ViragDevTool_AddData(LeaderKeyData.accountBindings, "LKMAP_ACCOUNT")
+		ViragDevTool_AddData(LeaderKeyData.classBindings, "LKMAP_CLASS")
+		-- ViragDevTool_AddData(LeaderKey.GetCurrentClassBindingsTree(), "LKMAP_CURRENT_CLASS")
+		ViragDevTool_AddData(LeaderKey.VDT, "LeaderKey")
+		--ViragDevTool_AddData(ViragCurrentSpecBindingsPointer.bindings, "LKMAP")
 	end
-	tinsert(listeners, f)
+
+end
+do
+	local addonIsLoaded = false
+	function events:ADDON_LOADED(...)
+		if addonIsLoaded then return end
+
+		-- LeaderKeyData = nil -- for debugging
+		-- LeaderKey.loadstuff() -- load in my keybindings if something goes wrong and I have to restore from backup.
+
+		LeaderKeyData = LeaderKeyData or {} -- TODO initialize account/class/spec/character bindings?
+		LeaderKey.UpdateKeybinds()
+
+		addonIsLoaded = true
+	end
+end
+function events:PLAYER_REGEN_ENABLED(...)
+	LeaderKey.private.flushOutOfCombatQueue()
 end
 
-function LeaderKey.UpdateDynamicMenu(token)
-	print("NYI - UpdateDynamicMenu")
-end
-
+registerEventHandlers(events)
 

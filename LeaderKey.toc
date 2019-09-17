@@ -12,12 +12,17 @@ embeds.xml
 frames.xml
 
 LeaderKey.lua
+Log.lua
 utils.lua
 BindingsTree.lua
 SecureKeySequenceProcessing.lua
 main.lua
+DynamicMenus.lua
 PopupMenu.lua
 SlashCommands.lua
+Editor.lua
+
+InventoryPlugin.lua
 
 test.lua
 

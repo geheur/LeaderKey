@@ -2,7 +2,6 @@ LeaderKey.private.Log = {}
 
 local ns = LeaderKey.private
 local colors = LeaderKey.private.colors
-local Log = ns.Log
 
 local Node = LeaderKey.BindingsTree.Node
 
@@ -38,27 +37,6 @@ function ns.copyKeySequence(keysequence)
 		copy[#copy + 1] = v
 	end
 	return copy
-end
-
-function ns.Log.info(...)
-	print("[LeaderKey]:", ...)
-end
-
-function ns.Log.warn(...)
-	print("|cFFFFA500[LeaderKey]:", ...)
-end
-
-function ns.Log.debug(...)
-	local str = "|cFFFFA500" .. "[LeaderKey]: "
-	for _,arg in ipairs({...}) do
-		str = str .. " " .. tostring(arg)
-	end
-
-	ChatFrame5:AddMessage(str)
-end
-
-function ns.Log.error(...)
-	print("|cFFFF0000[LeaderKey]:", ...)
 end
 
 -- ### secure table insert
