@@ -6,6 +6,7 @@ local Node = LeaderKey.BindingsTree.Node
 
 local keySequencePrefix = {"L"}
 local dynamicMenuPrefix = {"D"}
+LeaderKey.private.dynamicMenuPrefix = dynamicMenuPrefix
 
 local function CreateRootMenu()
 	local rootmenu = BindingsTree:cast(Node.CreateSubmenu("Root"))
@@ -149,7 +150,7 @@ function LeaderKey.GetCharacterBindingsTree(node, keySequence)
 end
 --]]
 
-local function prepend(prefix, keySequence)
+function LeaderKey.private.prepend(prefix, keySequence)
 	local result = {}
 	for i=1,#prefix do
 		result[#result + 1] = prefix[i]
@@ -161,11 +162,11 @@ local function prepend(prefix, keySequence)
 end
 
 function LeaderKey.GetDynamicMenuSequence(name)
-	return prepend(dynamicMenuPrefix, {name})
+	return LeaderKey.private.prepend(dynamicMenuPrefix, {name})
 end
 
 function LeaderKey.GetDynamicMenuHandle(name)
-	local sequence = prepend(dynamicMenuPrefix, {name})
+	local sequence = LeaderKey.private.prepend(dynamicMenuPrefix, {name})
 	return RootNode:GetNode(sequence)
 end
 

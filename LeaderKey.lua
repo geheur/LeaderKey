@@ -1,5 +1,14 @@
-if not LeaderKey then LeaderKey = {} end
-if not LeaderKey.private then LeaderKey.private = {} end
+-- local _,private = ...
+-- private.env = {}
+-- setmetatable(private.env, {__index = _G})
+-- private.setenv = function()
+	-- setfenv(2, private.env)
+-- end
+
+-- select(2, ...).setenv
+
+LeaderKey = {}
+LeaderKey.private = {}
 
 local ns = LeaderKey.private
 

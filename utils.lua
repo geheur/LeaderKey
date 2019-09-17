@@ -1,7 +1,6 @@
-LeaderKey.private.Log = {}
-
 local ns = LeaderKey.private
 local colors = LeaderKey.private.colors
+local Log = ns.Log
 
 local Node = LeaderKey.BindingsTree.Node
 
