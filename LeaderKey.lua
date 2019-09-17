@@ -108,8 +108,11 @@ for bag = 0, NUM_BAG_SLOTS do
 				local node = Node.CreateMacroNode(itemName, "/equip "..itemName)
 				node.icon = itemIcon
 				tinsert(mydynamicmenu.bindings, node)
-			elseif itemType == "Consumable" then
-				tinsert(mydynamicmenu.bindings, Node.CreateMacroNode(itemName, "/use "..itemName))
+			else
+			-- elseif itemType == "Consumable" then
+				local node = Node.CreateMacroNode(itemName, "/use "..itemName)
+				node.icon = itemIcon
+				tinsert(mydynamicmenu.bindings, node)
 			end
 			-- print(itemName, itemType, itemSubType)
 		end

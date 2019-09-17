@@ -308,13 +308,17 @@ local menuGenerators = {
 		local keybind = lkKeybind("Keybind:", 100, nodeattributes, "keybind")
 		local macro = lkMacroscript("Macro text:", 300, nodeattributes, "macrotext")
 		local nodeName = lkEditBox("Node name:", 300, nodeattributes, "nodename")
+		parent:AddChild(prefix)
+		parent:AddChild(keybind)
+		parent:AddChild(macro)
+		parent:AddChild(nodeName)
+
+		nodeattributes.prefix = keysequence
+
 		if parent:GetUserDataTable().node then
 			local keysequenceprefix = LeaderKey.private.copyKeySequence(keysequence)
 			keysequenceprefix[#keysequenceprefix] = nil
-			s = ""
-			for i,v in pairs(keysequenceprefix) do
-				s = s .. " " .. v
-			end
+
 			nodeattributes.prefix = keysequenceprefix
 			nodeattributes.keybind = keysequence[#keysequence]
 			nodeattributes.macrotext = parent:GetUserDataTable().node.macro
@@ -324,10 +328,6 @@ local menuGenerators = {
 			macro:SetText(parent:GetUserDataTable().node.macro)
 			nodeName:SetText(parent:GetUserDataTable().node.name)
 		end
-		parent:AddChild(prefix)
-		parent:AddChild(keybind)
-		parent:AddChild(macro)
-		parent:AddChild(nodeName)
 	end,
 	[item] = function(parent, isSearchableChild, nodeattributes) -- same used for spells.
 		print("nyi")
@@ -345,45 +345,109 @@ local menuGenerators = {
 		-- name
 	end,
 	[Node.softlink] = function(parent, isSearchableChild, nodeattributes)
-		print("nyi.")
-		-- keybind
-		-- softlink
-		-- name
+		local s = ""
+		for i,v in pairs(keysequence) do
+			s = s .. " " .. v
+		end
+		local prefix = lkKeybindPrefixLabel(s, 500)
+		local keybind = lkKeybind("Keybind:", 100, nodeattributes, "keybind")
+		local nodeName = lkEditBox("Node name:", 300, nodeattributes, "nodename")
+		parent:AddChild(prefix)
+		parent:AddChild(keybind)
+		parent:AddChild(nodeName)
+
+		nodeattributes.prefix = keysequence
+
+		if parent:GetUserDataTable().node then
+			local keysequenceprefix = LeaderKey.private.copyKeySequence(keysequence)
+			keysequenceprefix[#keysequenceprefix] = nil
+
+			nodeattributes.prefix = keysequenceprefix
+			nodeattributes.keybind = keysequence[#keysequence]
+			nodeattributes.nodename = parent:GetUserDataTable().node.name
+			prefix:SetText(s)
+			keybind:SetKey(keysequence[#keysequence])
+			nodeName:SetText(parent:GetUserDataTable().node.name)
+		end
 	end
 }
 menuGenerators[spell] = menuGenerators[item]
--- for plugin in plugins do if menuGenerators[pluginName] then error end menuGenerators[pluginName] = pluginfunc.
+
+local nodeGenerators = {
+	-- actions
+	[Node.macro] = function(nodeattributes)
+		local node = Node.CreateMacroNode(nodeattributes.nodename, nodeattributes.macrotext)
+		return node
+	end,
+	[item] = function(nodeattributes) -- same used for spells.
+		print("nyi")
+		-- keybind
+		-- item/spell name
+	end,
+
+	-- technical types.
+	[Node.submenu] = function(nodeattributes)
+		-- keybind
+		-- name
+	end,
+	[Node.helmSubmenu] = function(nodeattributes)
+		-- keybind
+		-- name
+	end,
+	[Node.softlink] = function(nodeattributes)
+		print("nodeattributes.dynamicmenuname", nodeattributes.dynamicmenuname)
+		local sequence = LeaderKey.GetDynamicMenuSequence(nodeattributes.dynamicmenuname)
+
+		local node = Node.CreateSoftlink(nodeattributes.nodename, sequence)
+		return node
+	end
+}
+nodeGenerators[spell] = nodeGenerators[item]
 
 local aceguiframe = AceGui:Create("Frame")
 aceguiframe:Hide()
 aceguiframe:SetTitle("edit keybind")
 aceguiframe:SetStatusText("status text")
 
+local groupList = {[Node.macro]="Macro",[item]="Item"}
 local typeDropDown = AceGui:Create("DropdownGroup")
 typeDropDown:SetWidth(200)
-typeDropDown:SetGroupList{[Node.macro]="Macro",item="Item",todo="Todo"}
+typeDropDown:SetGroupList(groupList)
 typeDropDown:SetCallback("OnGroupSelected", function(self, callback, group)
 	self:ReleaseChildren()
 
 	local nodeattributes = {}
 	local isSearchableParent = false
 
-	local keysequence = LeaderKey.private.copyKeySequence(self:GetUserDataTable().keysequence or {})
-	if menuGenerators[group] then menuGenerators[group](self, isSearchableParent, nodeattributes, keysequence or {}) end
+	keysequence = LeaderKey.private.copyKeySequence(self:GetUserDataTable().keysequence or {})
+	print("group", group)
+
+	if menuGenerators[group] then menuGenerators[group](self, isSearchableParent, nodeattributes, keysequence or {})
+	else
+		nodeattributes.dynamicmenuname = group
+		menuGenerators[Node.softlink](self, isSearchableParent, nodeattributes, keysequence or {})
+	end
 
 	self:AddChild(button("Create keybind.", 200, function()
+		if not nodeattributes.keybind then print("no keybind") return end
+
 		print("nodeattributes")
 		for i,v in pairs(nodeattributes) do
 			print("\t", i,v)
 		end
 
-		if not nodeattributes.keybind then print("no keybind") return end
 		local fullkeysequence = LeaderKey.private.copyKeySequence(nodeattributes.prefix)
 		tinsert(fullkeysequence, nodeattributes.keybind)
-		local node = Node.CreateMacroNode(nodeattributes.nodename, nodeattributes.macrotext)
-		LeaderKey.dobind(keysequence, node)
 
-		LeaderKey.UpdateKeybinds()
+		local node
+		if nodeGenerators[group] then node = nodeGenerators[group](nodeattributes)
+		else
+			nodeattributes.dynamicMenuName = group
+			node = nodeGenerators[Node.softlink](nodeattributes)
+		end
+
+		print("dobind")
+		LeaderKey.dobind(fullkeysequence, node)
 
 		-- reset state so that the editbox can be used again.
 		keysequence = LeaderKey.private.copyKeySequence(self:GetUserDataTable().keysequence)
@@ -411,6 +475,12 @@ function showEditor(keySequence, node)
 	aceguiframe:Show()
 	typeDropDown:SetGroup("macro")
 end
+
+LeaderKey.RegisterForDynamicMenuAdded(function(name, node)
+	if groupList[name] then error("name already in use.") return end
+	groupList[name] = name
+	typeDropDown:SetGroupList(groupList)
+end)
 
 --[[
 /lkl[ist]
@@ -491,6 +561,8 @@ radio:SetValue(1)
 aceguiframe:AddChild(radio)
 --aceguiframe:SetLayout("Flow")
 
+
+-- for plugin in plugins do if menuGenerators[pluginName] then error end menuGenerators[pluginName] = pluginfunc.
 
 
 

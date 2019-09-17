@@ -113,10 +113,10 @@ local function displayNodes(nodeList)
 		end
 		local nodeName = "TODO removeme"
 		if nextNode.type == Node.MACRO then
-			if strfind(nextNode.macro, "use") then
-			else
+			-- if strfind(nextNode.macro, "use") then
+			-- else
 				nodeName = (nextNode.name or nextNode.macro or "nil")
-			end
+			-- end
 		else
 			nodeName = (nextNode.name or "[no name]")
 		end
@@ -134,7 +134,10 @@ local function displayNodes(nodeList)
 				actionFrame.icon:SetPoint("TOPLEFT")
 				actionFrame.icon:SetSize(50,50)
 			end
-			actionFrame.itemIcon:SetTexture(select(10, GetItemInfo(818)))
+			local texture = select(10, GetItemInfo(nodeName))
+			if texture then actionFrame.itemIcon:SetTexture(texture) actionFrame.itemIcon:Show()
+			else actionFrame.itemIcon:Hide()
+			end
 			-- SetItemButtonTexture(itemFrame, GetContainerItemInfo(1,6))
 			-- local itemFrame = CreateFrame("Button", nil, actionFrame, "ContainerFrameItemButtonTemplate")
 			-- itemFrame.icon = itemFrame:CreateTexture()

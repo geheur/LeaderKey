@@ -165,6 +165,10 @@ local function prepend(prefix, keySequence)
 	return result
 end
 
+function LeaderKey.GetDynamicMenuSequence(name)
+	return prepend(dynamicMenuPrefix, {name})
+end
+
 function LeaderKey.GetDynamicMenuHandle(name)
 	local sequence = prepend(dynamicMenuPrefix, {name})
 	return RootNode:GetNode(sequence)
@@ -200,6 +204,7 @@ dmHandle.registerCallback(function(node, sequence) print("selected:", node.name)
 
 --]]
 
+local listeners = {}
 LeaderKey.DynamicMenuRegistry = {}
 function LeaderKey.RegisterDynamicMenu(name, node)
 	local sequence = prepend(dynamicMenuPrefix, {name}) -- name is used as the keybind only because it'll be unique. it's a searchable menu anyways so this won't affect usability.
@@ -208,6 +213,17 @@ function LeaderKey.RegisterDynamicMenu(name, node)
 		RootNode:AddBind(node, sequence)
 	end)
 	LeaderKey.UpdateKeybinds()
+
+	for _,listener in ipairs(listeners) do
+		listener(name, node)
+	end
+end
+
+function LeaderKey.RegisterForDynamicMenuAdded(f)
+	for name,node in pairs(LeaderKey.DynamicMenuRegistry) do
+		f(name, node)
+	end
+	tinsert(listeners, f)
 end
 
 function LeaderKey.UpdateDynamicMenu(token)
