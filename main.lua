@@ -1,12 +1,10 @@
-local Log = LeaderKey.private.Log
-local secureTableInsert = LeaderKey.private.secureTableInsert
+select(2, ...).setenv()
 
 local BindingsTree = LeaderKey.BindingsTree
 local Node = LeaderKey.BindingsTree.Node
 
-local keySequencePrefix = {"L"}
-local dynamicMenuPrefix = {"D"}
-LeaderKey.private.dynamicMenuPrefix = dynamicMenuPrefix
+keySequencePrefix = {"L"}
+dynamicMenuPrefix = {"D"}
 
 local function CreateRootMenu()
 	local rootmenu = BindingsTree:cast(Node.CreateSubmenu("Root"))
@@ -15,7 +13,7 @@ local function CreateRootMenu()
 	return rootmenu
 end
 
-local RootNode = CreateRootMenu()
+RootNode = CreateRootMenu()
 LeaderKey.VDT.RootNode = RootNode
 
 local CurrentBindings
@@ -43,27 +41,27 @@ end
 local function UpdateKeybinds_OutOfCombat()
 	BuildCurrentBindingsTree()
 
-	LeaderKey.private.LeaderKeyOverrideBindOwner:Execute("self:ClearBindings()")
+	LeaderKeyOverrideBindOwner:Execute("self:ClearBindings()")
 	local LeaderKeyNode = CurrentBindings
 	for key,_ in pairs(LeaderKeyNode.bindings) do
-		SetOverrideBindingClick(LeaderKey.private.LeaderKeyOverrideBindOwner, true, key, LeaderKey.private.AfterLeaderKeyHandlerFrame:GetName(), key)
+		SetOverrideBindingClick(LeaderKeyOverrideBindOwner, true, key, AfterLeaderKeyHandlerFrame:GetName(), key)
 	end
 
-	secureTableInsert(LeaderKey.private.AfterLeaderKeyHandlerFrame, "Bindings", RootNode)
-	LeaderKey.private.AfterLeaderKeyHandlerFrame:Execute("self:Run(ClearSequenceInProgress)")
+	secureTableInsert(AfterLeaderKeyHandlerFrame, "Bindings", RootNode)
+	AfterLeaderKeyHandlerFrame:Execute("self:Run(ClearSequenceInProgress)")
 end
 
 -- Updates keybind tree in AfterLeaderKeyHandlerFrame's restricted environment, and makes sure leader keys are bound. Out of combat only, obviously.
 local updateQueue = {}
 local updateKeybindsQueued = false
-function LeaderKey.private.doOutOfCombat(func)
+function doOutOfCombat(func)
 	if InCombatLockdown() then
 		tinsert(updateQueue, func)
 	else
 		func()
 	end
 end
-function LeaderKey.private.flushOutOfCombatQueue()
+function flushOutOfCombatQueue()
 	if updateKeybindsQueued then
 		UpdateKeybinds_OutOfCombat()
 		updateKeybindsQueued = false
@@ -150,7 +148,7 @@ function LeaderKey.GetCharacterBindingsTree(node, keySequence)
 end
 --]]
 
-function LeaderKey.private.prepend(prefix, keySequence)
+function prepend(prefix, keySequence)
 	local result = {}
 	for i=1,#prefix do
 		result[#result + 1] = prefix[i]
@@ -162,11 +160,11 @@ function LeaderKey.private.prepend(prefix, keySequence)
 end
 
 function LeaderKey.GetDynamicMenuSequence(name)
-	return LeaderKey.private.prepend(dynamicMenuPrefix, {name})
+	return prepend(dynamicMenuPrefix, {name})
 end
 
 function LeaderKey.GetDynamicMenuHandle(name)
-	local sequence = LeaderKey.private.prepend(dynamicMenuPrefix, {name})
+	local sequence = prepend(dynamicMenuPrefix, {name})
 	return RootNode:GetNode(sequence)
 end
 
@@ -186,7 +184,7 @@ end
 local events = {}
 function events:PLAYER_ENTERING_WORLD(...)
 -- LeaderKey.private.AfterLeaderKeyHandlerFrame:SetFrameRef("ref", MovePadJump) -- This isn't really a good way to do it because it has to happen out of combat.
-	LeaderKey.private.Log.debug("PLAYER_ENTERING_WORLD")
+	Log.debug("PLAYER_ENTERING_WORLD")
 	local debug = true
 	if ViragDevTool_AddData and debug then
 		ViragDevTool_AddData(LeaderKey.ViragCurrentBindingsPointer.bindings, "LKMAP")

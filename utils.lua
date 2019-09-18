@@ -1,11 +1,9 @@
-local ns = LeaderKey.private
-local colors = LeaderKey.private.colors
-local Log = ns.Log
+select(2, ...).setenv()
 
 local Node = LeaderKey.BindingsTree.Node
 
 -- ### utility
-function ns.slice(tbl, first, last, step)
+function slice(tbl, first, last, step)
   local sliced = {}
 
   for i = first or 1, last or #tbl, step or 1 do
@@ -15,7 +13,7 @@ function ns.slice(tbl, first, last, step)
   return sliced
 end
 
-function ns.tableSize(tbl)
+function tableSize(tbl)
 	local count = 0
 	for i,v in pairs(tbl) do
 		count = count + 1
@@ -23,14 +21,14 @@ function ns.tableSize(tbl)
 	return count
 end
 
-function ns.tableIsEmpty(tbl)
+function tableIsEmpty(tbl)
 	for i,v in pairs(tbl) do
 		return false
 	end
 	return true
 end
 
-function ns.copyKeySequence(keysequence)
+function copyKeySequence(keysequence)
 	local copy = {}
 	for _,v in pairs(keysequence) do
 		copy[#copy + 1] = v
@@ -137,7 +135,7 @@ do
 			end
 		end
 	--]=],%s)]]
-	function ns.secureTableInsert(secureHeader, varName, toSerialize)
+	function secureTableInsert(secureHeader, varName, toSerialize)
 		local startTime = debugprofilestop()
 		local strarray = {}
 		serializeVariable(varName, toSerialize, strarray)
@@ -148,7 +146,7 @@ do
 	end
 end
 
-ns.keyCodeToChar = { ["A"]="a", ["B"]="b", ["C"]="c", ["D"]="d", ["E"]="e", ["F"]="f", ["G"]="g", ["H"]="h", ["I"]="i", ["J"]="j", ["K"]="k", ["L"]="l", ["M"]="m", ["N"]="n", ["O"]="o", ["P"]="p", ["Q"]="q", ["R"]="r", ["S"]="s", ["T"]="t", ["U"]="u", ["V"]="v", ["W"]="w", ["X"]="x", ["Y"]="y", ["Z"]="z", ["SHIFT-A"]="A", ["SHIFT-B"]="B", ["SHIFT-C"]="C", ["SHIFT-D"]="D", ["SHIFT-E"]="E", ["SHIFT-F"]="F", ["SHIFT-G"]="G", ["SHIFT-H"]="H", ["SHIFT-I"]="I", ["SHIFT-J"]="J", ["SHIFT-K"]="K", ["SHIFT-L"]="L", ["SHIFT-M"]="M", ["SHIFT-N"]="N", ["SHIFT-O"]="O", ["SHIFT-P"]="P", ["SHIFT-Q"]="Q", ["SHIFT-R"]="R", ["SHIFT-S"]="S", ["SHIFT-T"]="T", ["SHIFT-U"]="U", ["SHIFT-V"]="V", ["SHIFT-W"]="W", ["SHIFT-X"]="X", ["SHIFT-Y"]="Y", ["SHIFT-Z"]="Z", ["SPACE"]=" ", ["1"]="1", ["2"]="2", ["3"]="3", ["4"]="4", ["5"]="5", ["6"]="6", ["7"]="7", ["8"]="8", ["9"]="9", ["0"]="0", ["SHIFT-1"]="!", ["SHIFT-2"]="@", ["SHIFT-3"]="#", ["SHIFT-4"]="$", ["SHIFT-5"]="%", ["SHIFT-6"]="^", ["SHIFT-7"]="&", ["SHIFT-8"]="*", ["SHIFT-9"]="(", ["SHIFT-0"]=")", [";"]=";", ["'"]="'", ["["]="[", ["]"]="]", ["-"]="-", ["="]="=", ["\\"]="\\", [","]=",", ["."]=".", ["/"]="/", ["SHIFT-;"]=":", ["SHIFT-'"]='"', ["SHIFT-["]="{", ["SHIFT-]"]="}", ["SHIFT--"]="_", ["SHIFT-="]="+", ["SHIFT-\\"]="|", ["SHIFT-,"]="<", ["SHIFT-."]=">", ["SHIFT-/"]="?", }
+keyCodeToChar = { ["A"]="a", ["B"]="b", ["C"]="c", ["D"]="d", ["E"]="e", ["F"]="f", ["G"]="g", ["H"]="h", ["I"]="i", ["J"]="j", ["K"]="k", ["L"]="l", ["M"]="m", ["N"]="n", ["O"]="o", ["P"]="p", ["Q"]="q", ["R"]="r", ["S"]="s", ["T"]="t", ["U"]="u", ["V"]="v", ["W"]="w", ["X"]="x", ["Y"]="y", ["Z"]="z", ["SHIFT-A"]="A", ["SHIFT-B"]="B", ["SHIFT-C"]="C", ["SHIFT-D"]="D", ["SHIFT-E"]="E", ["SHIFT-F"]="F", ["SHIFT-G"]="G", ["SHIFT-H"]="H", ["SHIFT-I"]="I", ["SHIFT-J"]="J", ["SHIFT-K"]="K", ["SHIFT-L"]="L", ["SHIFT-M"]="M", ["SHIFT-N"]="N", ["SHIFT-O"]="O", ["SHIFT-P"]="P", ["SHIFT-Q"]="Q", ["SHIFT-R"]="R", ["SHIFT-S"]="S", ["SHIFT-T"]="T", ["SHIFT-U"]="U", ["SHIFT-V"]="V", ["SHIFT-W"]="W", ["SHIFT-X"]="X", ["SHIFT-Y"]="Y", ["SHIFT-Z"]="Z", ["SPACE"]=" ", ["1"]="1", ["2"]="2", ["3"]="3", ["4"]="4", ["5"]="5", ["6"]="6", ["7"]="7", ["8"]="8", ["9"]="9", ["0"]="0", ["SHIFT-1"]="!", ["SHIFT-2"]="@", ["SHIFT-3"]="#", ["SHIFT-4"]="$", ["SHIFT-5"]="%", ["SHIFT-6"]="^", ["SHIFT-7"]="&", ["SHIFT-8"]="*", ["SHIFT-9"]="(", ["SHIFT-0"]=")", [";"]=";", ["'"]="'", ["["]="[", ["]"]="]", ["-"]="-", ["="]="=", ["\\"]="\\", [","]=",", ["."]=".", ["/"]="/", ["SHIFT-;"]=":", ["SHIFT-'"]='"', ["SHIFT-["]="{", ["SHIFT-]"]="}", ["SHIFT--"]="_", ["SHIFT-="]="+", ["SHIFT-\\"]="|", ["SHIFT-,"]="<", ["SHIFT-."]=">", ["SHIFT-/"]="?", }
 
 --[[
 (key1 key2 key3) -- off-white

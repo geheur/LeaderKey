@@ -1,20 +1,19 @@
--- local _,private = ...
--- private.env = {}
--- setmetatable(private.env, {__index = _G})
--- private.setenv = function()
-	-- setfenv(2, private.env)
--- end
+local _,private = ...
+private.env = {}
+setmetatable(private.env, {__index = _G})
+private.setenv = function()
+	setfenv(2, private.env)
+end
 
--- select(2, ...).setenv
+select(2, ...).setenv()
 
-LeaderKey = {}
-LeaderKey.private = {}
+_G.LeaderKey = {}
+LeaderKey.private = private.env
+LeaderKey.VDT = {}
 
-local ns = LeaderKey.private
+VDT = {} -- Virag dev tools pointer.
 
-LeaderKey.VDT = {} -- Virag dev tools pointer.
-
-ns.runTests = true
+runTests = true
 
 LeaderKey.BindingsTree = {}
 -- ### Node types
@@ -32,15 +31,15 @@ LeaderKey.BindingsTree.Node.SPELL = LeaderKey.BindingsTree.Node.spell
 LeaderKey.BindingsTree.Node.SOFTLINK = LeaderKey.BindingsTree.Node.softlink
 
 -- ### Colors
-ns.colors = {}
+colors = {}
 -- TODO name these with a canonical name.
-ns.colors[LeaderKey.BindingsTree.Node.submenu] = "acd3ff"
-ns.colors[LeaderKey.BindingsTree.Node.helmSubmenu] = "51baff"
-ns.colors[LeaderKey.BindingsTree.Node.macro] = "ffa500"
-ns.colors[LeaderKey.BindingsTree.Node.softlink] = "3dd91e"
-ns.colors.castPrint = "ff00ff"
-ns.colors.keySequence = "c8cfa7"
-for name,color in pairs(ns.colors) do
-	ns.colors[name] = "|cff" .. color
+colors[LeaderKey.BindingsTree.Node.submenu] = "acd3ff"
+colors[LeaderKey.BindingsTree.Node.helmSubmenu] = "51baff"
+colors[LeaderKey.BindingsTree.Node.macro] = "ffa500"
+colors[LeaderKey.BindingsTree.Node.softlink] = "3dd91e"
+colors.castPrint = "ff00ff"
+colors.keySequence = "c8cfa7"
+for name,color in pairs(colors) do
+	colors[name] = "|cff" .. color
 end
-ns.colors.noColor = "|r"
+colors.noColor = "|r"

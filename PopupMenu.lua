@@ -1,7 +1,4 @@
-local Log = LeaderKey.private.Log
-local tableIsEmpty = LeaderKey.private.tableIsEmpty
-
-local colors = LeaderKey.private.colors
+select(2, ...).setenv()
 
 local Node = LeaderKey.BindingsTree.Node
 local isMenu = Node.isMenu
@@ -46,7 +43,7 @@ local function clearListItems()
 	end
 end
 
-function LeaderKey.private.sequenceStringToArray(keySequenceString)
+function sequenceStringToArray(keySequenceString)
 	local keySequence = {}
 	for key in keySequenceString:gmatch("%S+") do
 		keySequence[#keySequence + 1] = key
@@ -175,7 +172,7 @@ local function displayKeySequenceState(keySequenceString, helmString)
 		Log.debug("Helm string detected", helmString)
 	end
 
-	local keySequence = LeaderKey.private.sequenceStringToArray(keySequenceString)
+	local keySequence = sequenceStringToArray(keySequenceString)
 
 	clearListItems()
 
@@ -197,7 +194,7 @@ local function displayKeySequenceState(keySequenceString, helmString)
 
 		LeaderKeyMenuSequenceInProgressBar.Text:SetText((node.name or "nil") .. " " .. (helmString or "nil") .. "_")
 
-		local matchingNodes = LeaderKey.private.helmMenuSearch(helmString, node.bindings)
+		local matchingNodes = helmMenuSearch(helmString, node.bindings)
 		displayNodes(matchingNodes)
 	elseif node.type == Node.MACRO then
 		LeaderKeyMenu:Hide()

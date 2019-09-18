@@ -1,11 +1,8 @@
+select(2, ...).setenv()
+
 local BindingsTree = LeaderKey.BindingsTree
-local Node = BindingsTree.Node
+local Node = LeaderKey.BindingsTree.Node
 
-local slice = LeaderKey.private.slice
-local tableSize = LeaderKey.private.tableSize
-local Log = LeaderKey.private.Log
-
--- ### Node constructors.
 local SUBMENU = Node.submenu
 local HELM_SUBMENU = Node.helmSubmenu
 local MACRO = Node.macro
@@ -13,6 +10,7 @@ local SOFTLINK = Node.softlink
 local SPELL = Node.spell
 -- local PET = Node.spell
 
+-- ### Node constructors.
 function Node.CreateNode(name, type)
 	return {name = name, type = type}
 end

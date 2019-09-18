@@ -1,9 +1,10 @@
 -- ### BindingsTree test
+select(2, ...).setenv()
+
 local BindingsTree = LeaderKey.BindingsTree
 local Node = LeaderKey.BindingsTree.Node
-local Log = LeaderKey.private.Log
 
-if LeaderKey.private.runTests then
+if runTests then
 	local Bindings = BindingsTree:new()
 
 	local function rsc(id,  txt)

@@ -1,10 +1,9 @@
-local Log = LeaderKey.private.Log
+select(2, ...).setenv()
+
 local Node = LeaderKey.BindingsTree.Node
-local secureTableInsert = LeaderKey.private.secureTableInsert
 
 -- ### Core keybind setup code.
-local AfterLeaderKeyHandlerFrame = CreateFrame("BUTTON", "After Leader Key Handler Frame", nil, "SecureHandlerClickTemplate,SecureActionButtonTemplate")
-LeaderKey.private.AfterLeaderKeyHandlerFrame = AfterLeaderKeyHandlerFrame
+AfterLeaderKeyHandlerFrame = CreateFrame("BUTTON", "After Leader Key Handler Frame", nil, "SecureHandlerClickTemplate,SecureActionButtonTemplate")
 
 AfterLeaderKeyHandlerFrame:RegisterForClicks(--[["AnyUp", ]]"AnyDown")
 
@@ -41,7 +40,7 @@ do
 	)
 	local context = {debugPrint=Log.debug, pairs=pairs, strfind=strfind}
 	setfenv(func, context)
-	if err then error(err) else LeaderKey.private.helmMenuSearch = func() end
+	if err then error(err) else helmMenuSearch = func() end
 end
 
 -- TODO some of these are like 1k characters in order to insert like 15 characters of payload. Can this be improved?
@@ -49,7 +48,7 @@ secureTableInsert(AfterLeaderKeyHandlerFrame, "SUBMENU", Node.SUBMENU)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "MACRO", Node.MACRO)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "HELM_SUBMENU", Node.HELM_SUBMENU)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "SOFTLINK", Node.SOFTLINK)
-secureTableInsert(AfterLeaderKeyHandlerFrame, "TYPABLE_CHARS", LeaderKey.private.keyCodeToChar)
+secureTableInsert(AfterLeaderKeyHandlerFrame, "TYPABLE_CHARS", keyCodeToChar)
 secureTableInsert(AfterLeaderKeyHandlerFrame, "prefix", keySequencePrefix)
 local helmMenuSearchRestrictedSnippet = [[
 	local str = arg1
@@ -69,7 +68,7 @@ end
 
 local currentSequence, currentHelmString
 function AfterLeaderKeyHandlerFrame:printOptions(keySequenceString, helmString)
-	currentSequence = keySequenceString and LeaderKey.private.sequenceStringToArray(keySequenceString) or {}
+	currentSequence = keySequenceString and sequenceStringToArray(keySequenceString) or {}
 	currentHelmString = helmString
 	for _,listener in ipairs(keySequenceStateUpdateListeners) do
 		listener(keySequenceString, helmString)
@@ -330,13 +329,12 @@ function LeaderKey.IsMenuOpen()
 end
 
 function LeaderKey.GetCurrentKeySequence()
-	local keysequence = LeaderKey.private.copyKeySequence(currentSequence)
+	local keysequence = copyKeySequence(currentSequence)
 	tremove(keysequence, 1)
 	return keysequence, currentHelmString
 end
 
-local LeaderKeyOverrideBindOwner = CreateFrame("BUTTON", "Leader Key Override Bind Owner", nil, "SecureHandlerBaseTemplate")
-LeaderKey.private.LeaderKeyOverrideBindOwner = LeaderKeyOverrideBindOwner
+LeaderKeyOverrideBindOwner = CreateFrame("BUTTON", "Leader Key Override Bind Owner", nil, "SecureHandlerBaseTemplate")
 
 function AfterLeaderKeyHandlerFrame:errorPrint(...)
 	Log.error(...)

@@ -1,7 +1,6 @@
 -- ### Slash commands.
 -- TODO usage info for bad command
-
-local Log = LeaderKey.private.Log
+select(2, ...).setenv()
 
 local Node = LeaderKey.BindingsTree.Node
 
@@ -96,7 +95,7 @@ local function HandleKey(frame, key, keyup)
 	end
 end
 
-local function doBind(keySequence, nodeToAdd)
+function doBind(keySequence, nodeToAdd)
 	local s = ""
 	for i,v in pairs(keySequence) do
 		s = s .. " " .. v
@@ -113,8 +112,6 @@ local function doBind(keySequence, nodeToAdd)
 
 	LeaderKey.UpdateKeybinds()
 end
-
-LeaderKey.dobind = doBind
 
 local function doUnbind(keySequence)
 	local s = ""
